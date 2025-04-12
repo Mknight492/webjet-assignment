@@ -1,0 +1,19 @@
+When reviewing your completed exercise, this will help us gain a better understanding of your thought process when you’re developing apps, thus the requirements have been left open ended. The test specifically makes mention of the flaky nature of the API’s. You should design a solution to have a functioning app when not all the services behind the scenes are functioning at 100%. The goal of the test is to allow you to present your code to the best of your ability, that you feel proud of.
+
+Webjet API Test
+The task is to develop a web application enabling users to compare movie prices from two providers and display cheapest price for the movie.
+
+The solution should ensure the app remains functional even if one or both providers are not fully operational. The goal of the test is to allow you to present your best code that you feel proud off. Please feel free to formulate any assumptions necessary for the task and ensure they are documented appropriately.
+
+The details of two API operations available for the providers Cinemaworld and Filmworld:
+
+movies: This operation allows retrieving a list of movies available on Cinemaworld or Filmworld. It provides information such as movie id, title, release year etc.
+Endpoint: GET `https://webjetapitest.azurewebsites.net/api/cinemaworld/movies`
+Endpoint: GET `https://webjetapitest.azurewebsites.net/api/filmworld/movies`
+
+movie/{ID}: This operation fetches detailed information about a specific movie on Cinemaworld or Filmworld, including additional metadata and price.
+Endpoint: GET `https://webjetapitest.azurewebsites.net/api/cinemaworld/movie/{ID}`
+Endpoint: GET `https://webjetapitest.azurewebsites.net/api/filmworld/movie/{ID}`
+To access Cinemaworld and Filmworld API, you'll require an API token. It's crucial to securely handle the API token without exposing it to the public.
+
+Similar to real-world scenarios, Cinemaworld and Filmworld APIs may experience intermittent issues. :)
