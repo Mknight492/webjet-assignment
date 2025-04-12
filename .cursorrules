@@ -233,7 +233,7 @@
     "development": {
       "backend": {
         "command": "dotnet run",
-        "url": "https://localhost:7001"
+        "url": "https://localhost:7168"
       },
       "frontend": {
         "command": "npm start",
