@@ -8,7 +8,7 @@ interface MovieGridProps {
   movies: MovieComparison[];
   isLoading: boolean;
   isError: boolean;
-  error: Error | null;
+  error: Error | string | null;
   refetch: () => void;
 }
 
@@ -27,7 +27,7 @@ const MovieGrid: React.FC<MovieGridProps> = ({
   if (isError) {
     return (
       <ErrorMessage 
-        message={error?.message || "Failed to load movies"} 
+        message={typeof error === 'string' ? error : error?.message || "Failed to load movies"} 
         onRetry={refetch} 
       />
     );

@@ -33,5 +33,9 @@ export interface MovieComparison {
     cinemaworld?: string;
     filmworld?: string;
   };
+  priceLoadingStates: {
+    cinemaworld: boolean;
+    filmworld: boolean;
+  };
   cheapestProvider: 'cinemaworld' | 'filmworld' | null;
 }

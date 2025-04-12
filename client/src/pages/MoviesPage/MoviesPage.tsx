@@ -7,7 +7,15 @@ import { Movie, MovieComparison, MovieDetail } from "../../types/Movie";
 const MoviesPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortBy, setSortBy] = useState("title");
-  const { providerMovies, movieDetails, priceComparisons, loading, error } = useStreamingMovies();
+  const { 
+    providerMovies, 
+    movieDetails, 
+    priceComparisons, 
+    loading, 
+    error,
+    providerErrors,
+    hasPartialData 
+  } = useStreamingMovies();
   
   // Transform the streaming data into MovieComparison objects
   const processedMovies: MovieComparison[] = React.useMemo(() => {
@@ -30,6 +38,10 @@ const MoviesPage: React.FC = () => {
           cinemaworld: undefined,
           filmworld: undefined
         },
+        priceLoadingStates: {
+          cinemaworld: true,
+          filmworld: true
+        },
         cheapestProvider: null
       };
       
@@ -37,11 +49,18 @@ const MoviesPage: React.FC = () => {
       movieGroup.forEach(movie => {
         const movieId = `${movie.provider}-${movie.id}`;
         const detail = movieDetails[movieId];
+        const provider = movie.provider.toLowerCase();
         
-        if (movie.provider.toLowerCase() === 'cinemaworld' && detail?.price !== undefined) {
-          comparison.prices.cinemaworld = detail.price.toString();
-        } else if (movie.provider.toLowerCase() === 'filmworld' && detail?.price !== undefined) {
-          comparison.prices.filmworld = detail.price.toString();
+        if (provider === 'cinemaworld') {
+          if (detail?.price !== undefined) {
+            comparison.prices.cinemaworld = detail.price.toString();
+            comparison.priceLoadingStates.cinemaworld = false;
+          }
+        } else if (provider === 'filmworld') {
+          if (detail?.price !== undefined) {
+            comparison.prices.filmworld = detail.price.toString();
+            comparison.priceLoadingStates.filmworld = false;
+          }
         }
       });
       
@@ -81,13 +100,26 @@ const MoviesPage: React.FC = () => {
             year: String(movie.year),
             poster: movie.poster,
             prices: {
-              cinemaworld: providerForKey === 'cinemaworld' && detail?.price !== undefined ? 
-                detail.price.toString() : undefined,
-              filmworld: providerForKey === 'filmworld' && detail?.price !== undefined ? 
-                detail.price.toString() : undefined
+              cinemaworld: undefined,
+              filmworld: undefined
+            },
+            priceLoadingStates: {
+              cinemaworld: providerForKey === 'cinemaworld',
+              filmworld: providerForKey === 'filmworld'
             },
             cheapestProvider: providerForKey // Only one provider so it's the cheapest
           };
+          
+          // Update price if we have it
+          if (detail?.price !== undefined) {
+            if (providerForKey === 'cinemaworld') {
+              comparison.prices.cinemaworld = detail.price.toString();
+              comparison.priceLoadingStates.cinemaworld = false;
+            } else if (providerForKey === 'filmworld') {
+              comparison.prices.filmworld = detail.price.toString();
+              comparison.priceLoadingStates.filmworld = false;
+            }
+          }
           
           comparisons.push(comparison);
           processedTitles.add(movie.title.toLowerCase());
@@ -164,6 +196,26 @@ const MoviesPage: React.FC = () => {
 
   return (
     <div>
+      {hasPartialData && Object.keys(providerErrors).length > 0 && (
+        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-yellow-700">
+                Some data may be incomplete. Showing the best available information.
+                <button onClick={refetch} className="ml-2 font-medium underline text-yellow-700 hover:text-yellow-600">
+                  Retry
+                </button>
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Movies</h1>
         
@@ -185,13 +237,49 @@ const MoviesPage: React.FC = () => {
 
       <FilterControls sortBy={sortBy} onSortChange={setSortBy} />
 
-      <MovieGrid
-        movies={filteredAndSortedMovies}
-        isLoading={loading}
-        isError={!!error}
-        error={error ? new Error(error) : null}
-        refetch={refetch}
-      />
+      {loading && !hasPartialData ? (
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+          {[...Array(10)].map((_, i) => (
+            <div key={i} className="bg-white rounded-lg shadow-md overflow-hidden">
+              <div className="animate-pulse">
+                <div className="bg-gray-300 h-56 w-full"></div>
+                <div className="p-4">
+                  <div className="h-4 bg-gray-300 rounded w-3/4 mb-2"></div>
+                  <div className="h-3 bg-gray-300 rounded w-1/2 mb-4"></div>
+                  <div className="h-3 bg-gray-300 rounded w-full mb-2"></div>
+                  <div className="h-3 bg-gray-300 rounded w-full"></div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : error && !hasPartialData ? (
+        <div className="text-center py-10">
+          <div className="text-red-500 text-4xl mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-700 mb-2">Unable to Load Movies</h2>
+          <p className="text-gray-600 mb-4">
+            {error || "We're having trouble connecting to the movie service."}
+          </p>
+          <button
+            onClick={refetch}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            Try Again
+          </button>
+        </div>
+      ) : (
+        <MovieGrid
+          movies={filteredAndSortedMovies}
+          isLoading={loading}
+          isError={false}
+          error={error}
+          refetch={refetch}
+        />
+      )}
     </div>
   );
 };

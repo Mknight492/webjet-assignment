@@ -8,6 +8,8 @@ export const useStreamingMovies = () => {
   const [priceComparisons, setPriceComparisons] = useState<Movie[][]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [providerErrors, setProviderErrors] = useState<Record<string, string>>({});
+  const [hasPartialData, setHasPartialData] = useState(false);
 
   useEffect(() => {
     const eventSource = new EventSource(`${process.env.REACT_APP_API_URL || 'https://localhost:7168/api'}/Movies/stream`);
@@ -18,6 +20,9 @@ export const useStreamingMovies = () => {
         const response = toCamelCase<ServiceResponse<any>>(rawResponse);
         
         if (response.success && response.data) {
+          // Set hasPartialData to true as soon as we get any successful data
+          setHasPartialData(true);
+          
           if (response.source === 'PriceComparison') {
             // This is a price comparison group
             setPriceComparisons(prev => [...prev, response.data]);
@@ -38,6 +43,13 @@ export const useStreamingMovies = () => {
             }));
           }
         } else {
+          // Track provider-specific errors
+          if (response.source) {
+            setProviderErrors(prev => ({
+              ...prev,
+              [response?.source ?? '']: response.message || 'Unknown error'
+            }));
+          }
           console.warn(`Error from ${response.source}: ${response.message}`);
         }
       } catch (err) {
@@ -48,7 +60,13 @@ export const useStreamingMovies = () => {
     
     eventSource.onerror = (err) => {
       console.error('SSE Error:', err);
-      setError('Connection error with movie stream');
+      // Only set global error if we have no data at all
+      if (!hasPartialData) {
+        setError('Connection error with movie stream');
+      } else {
+        // Otherwise just log the error but keep showing partial data
+        console.warn('Connection issue, but showing partial data', err);
+      }
       setLoading(false);
       eventSource.close();
     };
@@ -60,7 +78,15 @@ export const useStreamingMovies = () => {
     return () => {
       eventSource.close();
     };
-  }, []);
+  }, [hasPartialData]);
   
-  return { providerMovies, movieDetails, priceComparisons, loading, error };
+  return { 
+    providerMovies, 
+    movieDetails, 
+    priceComparisons, 
+    loading, 
+    error,
+    providerErrors,
+    hasPartialData
+  };
 }; 
