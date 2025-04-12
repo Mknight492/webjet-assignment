@@ -1,0 +1,192 @@
+{
+  "description": "Movie Price Comparison App with .NET BFF and React frontend in a monorepo structure",
+  "codebase": {
+    "structure": {
+      "client": {
+        "description": "React frontend application",
+        "src": {
+          "components": "React UI components",
+          "hooks": "Custom React hooks",
+          "context": "React context providers",
+          "utils": "Utility and helper functions",
+          "types": "TypeScript type definitions",
+          "pages": "Top-level page components",
+          "assets": "Static assets like images and icons"
+        },
+        "public": "Static assets and HTML template"
+      },
+      "server": {
+        "description": "ASP.NET Core Backend for Frontend (BFF)",
+        "Controllers": "API endpoints for the frontend",
+        "Services": "Business logic and external API integration",
+        "Models": "Data models and DTOs",
+        "Configuration": "App configuration and settings",
+        "Middleware": "Custom middleware components",
+        "Extensions": "Extension methods"
+      },
+      "shared": {
+        "description": "Shared code between frontend and backend",
+        "models": "Shared data models",
+        "constants": "Shared constants and enums"
+      },
+      "docs": "Documentation files"
+    }
+  },
+  "patterns": {
+    "BFF_CONTROLLER": {
+      "description": "Pattern for ASP.NET Core API controllers",
+      "examples": [
+        "server/Controllers/MoviesController.cs"
+      ]
+    },
+    "BFF_SERVICE": {
+      "description": "Pattern for ASP.NET Core services",
+      "examples": [
+        "server/Services/CinemaworldService.cs",
+        "server/Services/FilmworldService.cs",
+        "server/Services/MovieAggregatorService.cs"
+      ]
+    },
+    "REACT_COMPONENT": {
+      "description": "Pattern for React component files",
+      "examples": [
+        "client/src/components/MovieCard/MovieCard.tsx",
+        "client/src/components/PriceComparison/PriceComparison.tsx"
+      ]
+    },
+    "REACT_HOOK": {
+      "description": "Pattern for custom React hooks",
+      "examples": [
+        "client/src/hooks/useMovies.ts",
+        "client/src/hooks/useMovieDetails.ts"
+      ]
+    }
+  },
+  "concepts": {
+    "resilience": {
+      "description": "Strategies for handling API failures",
+      "examples": [
+        "Polly for .NET retry patterns",
+        "Circuit breaker pattern",
+        "Response caching",
+        "Fallback responses"
+      ]
+    },
+    "movie": {
+      "description": "Movie data model",
+      "fields": [
+        "id - unique identifier",
+        "title - movie name",
+        "year - release year",
+        "poster - poster image URL",
+        "price - movie price"
+      ]
+    },
+    "provider": {
+      "description": "Movie data provider",
+      "examples": [
+        "Cinemaworld",
+        "Filmworld"
+      ]
+    },
+    "BFF": {
+      "description": "Backend for Frontend pattern",
+      "responsibilities": [
+        "API token security",
+        "Request aggregation",
+        "Response transformation",
+        "Error handling",
+        "Caching"
+      ]
+    }
+  },
+  "conventions": {
+    "naming": {
+      "csharp": {
+        "classes": "PascalCase",
+        "methods": "PascalCase",
+        "properties": "PascalCase",
+        "interfaces": "IPascalCase",
+        "constants": "PascalCase"
+      },
+      "typescript": {
+        "components": "PascalCase",
+        "functions": "camelCase",
+        "variables": "camelCase",
+        "constants": "UPPER_SNAKE_CASE",
+        "types": "PascalCase with 'Type' suffix",
+        "interfaces": "PascalCase with 'I' prefix"
+      }
+    },
+    "structure": {
+      "react": {
+        "components": "Each component should have its own folder with index.ts export",
+        "tests": "Tests should be placed alongside the file they're testing with .test.ts extension"
+      },
+      "dotnet": {
+        "folders": "Group by feature rather than type where appropriate",
+        "tests": "Tests in separate project with matching structure"
+      }
+    }
+  },
+  "architecture": {
+    "backend": {
+      "framework": "ASP.NET Core 6+",
+      "patterns": [
+        "Dependency Injection",
+        "Repository Pattern",
+        "Options Pattern for configuration"
+      ],
+      "resilience": "Polly for retry and circuit breaker patterns",
+      "caching": "In-memory and distributed caching"
+    },
+    "frontend": {
+      "dataFlow": "Unidirectional data flow through React components",
+      "stateManagement": "React Query for server state, Context API for UI state",
+      "styling": "Tailwind CSS for utility-first styling approach"
+    },
+    "communication": "REST API between frontend and BFF"
+  },
+  "dependencies": {
+    "backend": [
+      ".NET 6+",
+      "Polly for resilience",
+      "Refit for typed HTTP clients",
+      "Serilog for logging"
+    ],
+    "frontend": [
+      "React",
+      "TypeScript",
+      "Axios",
+      "Tailwind CSS",
+      "React Query"
+    ],
+    "testing": {
+      "backend": [
+        "xUnit",
+        "Moq",
+        "FluentAssertions"
+      ],
+      "frontend": [
+        "Jest",
+        "React Testing Library"
+      ]
+    }
+  },
+  "environmentSetup": {
+    "development": {
+      "backend": {
+        "command": "dotnet run",
+        "url": "https://localhost:7001"
+      },
+      "frontend": {
+        "command": "npm start",
+        "url": "http://localhost:3000"
+      }
+    },
+    "building": {
+      "backend": "dotnet publish -c Release",
+      "frontend": "npm run build"
+    }
+  }
+}
