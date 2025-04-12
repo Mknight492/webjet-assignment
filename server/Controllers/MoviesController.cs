@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using MoviePriceComparison.Models;
+using MoviePriceComparison.Services.Interfaces;
 
 namespace MoviePriceComparison.Controllers;
 
@@ -7,10 +8,14 @@ namespace MoviePriceComparison.Controllers;
 [Route("api/[controller]")]
 public class MoviesController : ControllerBase
 {
+    private readonly IMovieAggregatorService _movieAggregator;
     private readonly ILogger<MoviesController> _logger;
 
-    public MoviesController(ILogger<MoviesController> logger)
+    public MoviesController(
+        IMovieAggregatorService movieAggregator,
+        ILogger<MoviesController> logger)
     {
+        _movieAggregator = movieAggregator;
         _logger = logger;
     }
 
@@ -20,12 +25,7 @@ public class MoviesController : ControllerBase
     {
         _logger.LogInformation("Getting all movies");
         
-        // Placeholder - will be implemented with service calls
-        var response = ServiceResponse<List<Movie>>.FromSuccess(new List<Movie>
-        {
-            new Movie { Id = "placeholder", Title = "Initial Setup - Movies will be fetched from services" }
-        });
-        
+        var response = await _movieAggregator.GetAllMoviesAsync();
         return Ok(response);
     }
 
@@ -36,12 +36,12 @@ public class MoviesController : ControllerBase
     {
         _logger.LogInformation("Getting movie details for ID: {Id}", id);
         
-        // Placeholder - will be implemented with service calls
-        var response = ServiceResponse<MovieDetails>.FromSuccess(new MovieDetails 
+        var response = await _movieAggregator.GetMovieDetailsAsync(id);
+        
+        if (!response.Success)
         {
-            Id = id,
-            Title = "Initial Setup - Movie details will be fetched from services" 
-        });
+            return NotFound(response);
+        }
         
         return Ok(response);
     }

@@ -7,15 +7,16 @@
 - Set up React frontend project
 - Configure development environments for both projects
 - Establish shared models/types between frontend and backend
-- Configure secure API token storage in .NET BFF
+- Configure secure API token storage in .NET BFF tf
 
 ## Phase 2: Backend Implementation
 
-- Implement typed HTTP clients for movie providers using Refit
+- Implement HTTP clients for movie providers
 - Create service abstractions for Cinemaworld and Filmworld APIs
+- Set up aggregation service to combine and compare results
+- Implement mocked services for Cinemaworld and Filmworld APIs for local development and testing
 - Implement retry policies and circuit breakers using Polly
 - Develop caching strategy for API responses
-- Set up aggregation service to combine and compare results
 - Create REST API endpoints for frontend consumption
 - Implement logging and monitoring
 - Set up error handling middleware

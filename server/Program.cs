@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.HttpLogging;
 using Microsoft.Extensions.Options;
 using System.Text.Json.Serialization;
 using MoviePriceComparison.Configuration;
+using MoviePriceComparison.Services;
+using MoviePriceComparison.Services.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -21,14 +23,14 @@ builder.Services.Configure<MovieApiOptions>(
 builder.Services.AddHttpClient("Cinemaworld", client =>
 {
     client.BaseAddress = new Uri("https://webjetapitest.azurewebsites.net/api/cinemaworld/");
-    client.DefaultRequestHeaders.Add("x-api-key", builder.Configuration["MovieApi:ApiKey"]);
+    client.DefaultRequestHeaders.Add("x-access-token", builder.Configuration["MovieApi:ApiKey"]);
     client.Timeout = TimeSpan.FromSeconds(5);
 });
 
 builder.Services.AddHttpClient("Filmworld", client =>
 {
     client.BaseAddress = new Uri("https://webjetapitest.azurewebsites.net/api/filmworld/");
-    client.DefaultRequestHeaders.Add("x-api-key", builder.Configuration["MovieApi:ApiKey"]);
+    client.DefaultRequestHeaders.Add("x-access-token", builder.Configuration["MovieApi:ApiKey"]);
     client.Timeout = TimeSpan.FromSeconds(5);
 });
 
@@ -53,8 +55,12 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 // Add caching
-builder.Services.AddMemoryCache();
 builder.Services.AddResponseCaching();
+
+// Register the services
+builder.Services.AddTransient<IMovieService, CinemaworldService>();
+builder.Services.AddTransient<IMovieService, FilmworldService>();
+builder.Services.AddTransient<IMovieAggregatorService, MovieAggregatorService>();
 
 var app = builder.Build();
 
