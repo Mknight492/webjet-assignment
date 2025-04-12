@@ -5,12 +5,30 @@
       "client": {
         "description": "React frontend application",
         "src": {
-          "components": "React UI components",
-          "hooks": "Custom React hooks",
+          "components": {
+            "description": "React UI components",
+            "MovieCard": "Displays movie information with price comparison",
+            "MovieGrid": "Responsive grid layout for movie cards",
+            "PriceComparison": "Shows price comparison between providers",
+            "SearchBar": "Allows users to search for movies",
+            "FilterControls": "Provides filtering options for movies",
+            "LoadingStates": "Skeleton loaders and loading indicators",
+            "ErrorStates": "Error handling UI components"
+          },
+          "hooks": {
+            "description": "Custom React hooks",
+            "useMovies": "Fetches movie list with resilience",
+            "useMovieDetails": "Fetches movie details with resilience",
+            "usePriceComparison": "Compares prices between providers"
+          },
           "context": "React context providers",
           "utils": "Utility and helper functions",
           "types": "TypeScript type definitions",
-          "pages": "Top-level page components",
+          "pages": {
+            "description": "Top-level page components",
+            "MoviesPage": "Main page showing movie grid",
+            "MovieDetailsPage": "Detailed view of a specific movie"
+          },
           "assets": "Static assets like images and icons"
         },
         "public": "Static assets and HTML template"
@@ -51,14 +69,25 @@
       "description": "Pattern for React component files",
       "examples": [
         "client/src/components/MovieCard/MovieCard.tsx",
-        "client/src/components/PriceComparison/PriceComparison.tsx"
+        "client/src/components/PriceComparison/PriceComparison.tsx",
+        "client/src/components/MovieGrid/MovieGrid.tsx",
+        "client/src/components/LoadingStates/SkeletonCard.tsx",
+        "client/src/components/ErrorStates/ErrorMessage.tsx"
       ]
     },
     "REACT_HOOK": {
       "description": "Pattern for custom React hooks",
       "examples": [
         "client/src/hooks/useMovies.ts",
-        "client/src/hooks/useMovieDetails.ts"
+        "client/src/hooks/useMovieDetails.ts",
+        "client/src/hooks/usePriceComparison.ts"
+      ]
+    },
+    "PAGE_COMPONENT": {
+      "description": "Pattern for top-level page components",
+      "examples": [
+        "client/src/pages/MoviesPage/MoviesPage.tsx",
+        "client/src/pages/MovieDetailsPage/MovieDetailsPage.tsx"
       ]
     }
   },
@@ -70,6 +99,13 @@
         "Circuit breaker pattern",
         "Response caching",
         "Fallback responses"
+      ],
+      "uiStrategies": [
+        "Progressive enhancement",
+        "Graceful degradation",
+        "Client-side caching",
+        "Retry mechanisms",
+        "Error states with fallback content"
       ]
     },
     "movie": {
@@ -97,6 +133,15 @@
         "Response transformation",
         "Error handling",
         "Caching"
+      ]
+    },
+    "uiStates": {
+      "description": "Different UI states for components",
+      "states": [
+        "Loading State - Skeleton placeholders and indicators",
+        "Success State - Complete information display",
+        "Partial Error State - Display available data with error indications",
+        "Complete Error State - Error message with retry options"
       ]
     }
   },
@@ -143,7 +188,18 @@
     "frontend": {
       "dataFlow": "Unidirectional data flow through React components",
       "stateManagement": "React Query for server state, Context API for UI state",
-      "styling": "Tailwind CSS for utility-first styling approach"
+      "styling": "Tailwind CSS for utility-first styling approach",
+      "componentHierarchy": "As defined in SPA-architecture.md",
+      "errorHandling": {
+        "individualFailures": "Show unavailable status for affected provider",
+        "providerFailure": "Use data from working provider with clear indication",
+        "completeFailure": "Use cached data with retry options"
+      },
+      "responsiveBreakpoints": [
+        "Mobile (<640px)",
+        "Tablet (640px-1024px)",
+        "Desktop (>1024px)"
+      ]
     },
     "communication": "REST API between frontend and BFF"
   },
