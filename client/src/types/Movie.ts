@@ -1,4 +1,4 @@
-// Movie type as returned by the movie list endpoint
+// Basic Movie type as returned by the movie list endpoint (after transformation)
 export interface Movie {
   id: string;
   title: string;
@@ -6,6 +6,11 @@ export interface Movie {
   type?: string;
   poster?: string;
   provider: string;
+  // Basic Movie doesn't have price
+}
+
+// Movie details type as returned by the movie details endpoint (after transformation)
+export interface MovieDetail extends Movie {
   plot?: string;
   rated?: string;
   released?: string;
@@ -14,13 +19,8 @@ export interface Movie {
   director?: string;
   writer?: string;
   actors?: string;
-  price?: number;
-}
-
-// Movie details type as returned by the movie details endpoint
-export interface MovieDetail extends Omit<Movie, 'Price'> {
-  Rating?: string;
-  Price: number; // Required in MovieDetails
+  price: number; // Only MovieDetail has price, and it's required
+  rating?: string;
 }
 
 // Movie with price comparison information

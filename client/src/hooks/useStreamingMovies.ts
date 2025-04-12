@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Movie, MovieDetail, ServiceResponse } from '../types';
+import { toCamelCase } from '../utils/casing';
 
 export const useStreamingMovies = () => {
   const [providerMovies, setProviderMovies] = useState<Record<string, Movie[]>>({});
@@ -13,25 +14,27 @@ export const useStreamingMovies = () => {
     
     eventSource.onmessage = (event) => {
       try {
-        const response = JSON.parse(event.data);
+        const rawResponse = JSON.parse(event.data);
+        const response = toCamelCase<ServiceResponse<any>>(rawResponse);
+        
         if (response.success && response.data) {
-          console.log(response.da);
-          if (response.source.endsWith('Details')) {
+          if (response.source === 'PriceComparison') {
+            // This is a price comparison group
+            setPriceComparisons(prev => [...prev, response.data]);
+          } else if (response?.source?.endsWith('Details')) {
             // This is movie details from a provider
-            const movieDetail = response.data;
-            console.log("movieDetail", movieDetail);
+            const movieDetail = response.data as MovieDetail;
             const provider = response.source.replace('Details', '');
             
             setMovieDetails(prev => ({
               ...prev,
-              [`${provider}-${movieDetail.Id}`]: movieDetail
+              [`${provider}-${movieDetail.id}`]: movieDetail
             }));
           } else {
             // This is a provider's movie list
-            // console.log(response.data);
             setProviderMovies(prev => ({
               ...prev,
-              [response.source]: response.data
+              [response?.source ?? '']: response.data
             }));
           }
         } else {

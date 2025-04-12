@@ -3,13 +3,13 @@ import type { Movie, MovieDetail } from './Movie';
 // Re-export existing Movie types
 export type { Movie, MovieDetail };
 
-// Add the ServiceResponse type
+// Add the ServiceResponse type using camelCase
 export interface ServiceResponse<T> {
-  Data: T | null;
-  Success: boolean;
-  Message: string | null;
-  Source: string | null;
-  FromCache: boolean;
+  data: T | null;
+  success: boolean;
+  message: string | null;
+  source: string | null;
+  fromCache: boolean;
 }
 
 // Rename MovieDetail to MovieDetails to match server-side model
