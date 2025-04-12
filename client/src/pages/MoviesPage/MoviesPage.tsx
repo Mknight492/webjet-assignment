@@ -1,50 +1,99 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import MovieGrid from "../../components/MovieGrid";
 import FilterControls from "../../components/FilterControls";
-import useMovies from "../../hooks/useMovies";
+import { useStreamingMovies } from "../../hooks/useStreamingMovies";
 import { Movie, MovieComparison } from "../../types/Movie";
 
 const MoviesPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortBy, setSortBy] = useState("title");
-  const { data, isLoading, isError, error, refetch } = useMovies();
-
-  // Transform the API movie data into the format needed for display
+  const { providerMovies, movieDetails, priceComparisons, loading, error } = useStreamingMovies();
+  
+  // Transform the streaming data into MovieComparison objects
   const processedMovies: MovieComparison[] = React.useMemo(() => {
-    if (!data?.Data) return [];
-
-    return data.Data.map((movie: Movie) => {
-      // In a real app, we'd get price data here or from a separate hook
-      // For now, let's simulate with mock prices
-      const cinemaworldPrice = Math.random() > 0.1 ? (10 + Math.random() * 20).toFixed(2) : undefined;
-      const filmworldPrice = Math.random() > 0.1 ? (10 + Math.random() * 20).toFixed(2) : undefined;
+    // Start with the price comparison groups which have the most complete data
+    const comparisons: MovieComparison[] = [];
+    
+    // Process price comparison groups first (highest quality data)
+    priceComparisons.forEach(movieGroup => {
+      if (movieGroup.length === 0) return;
       
-      // Determine the cheapest provider
-      let cheapestProvider: "cinemaworld" | "filmworld" | null = null;
+      // Group should contain the same movie from different providers
+      const firstMovie = movieGroup[0];
       
-      if (cinemaworldPrice && filmworldPrice) {
-        cheapestProvider = parseFloat(cinemaworldPrice) <= parseFloat(filmworldPrice) 
-          ? "cinemaworld" 
-          : "filmworld";
-      } else if (cinemaworldPrice) {
-        cheapestProvider = "cinemaworld";
-      } else if (filmworldPrice) {
-        cheapestProvider = "filmworld";
-      }
-
-      return {
-        id: movie.ID,
-        title: movie.Title,
-        year: movie.Year,
-        poster: movie.Poster,
+      const comparison: MovieComparison = {
+        id: firstMovie.Id,
+        title: firstMovie.Title,
+        year: String(firstMovie.Year),
+        poster: firstMovie.Poster,
         prices: {
-          cinemaworld: cinemaworldPrice,
-          filmworld: filmworldPrice,
+          cinemaworld: undefined,
+          filmworld: undefined
         },
-        cheapestProvider,
+        cheapestProvider: null
       };
+      
+      // Add prices from each provider
+      movieGroup.forEach(movie => {
+        if (movie.Provider.toLowerCase() === 'cinemaworld' && movie.Price !== undefined) {
+          comparison.prices.cinemaworld = movie.Price.toString();
+        } else if (movie.Provider.toLowerCase() === 'filmworld' && movie.Price !== undefined) {
+          comparison.prices.filmworld = movie.Price.toString();
+        }
+      });
+      
+      // Determine cheapest provider
+      if (comparison.prices.cinemaworld && comparison.prices.filmworld) {
+        const cwPrice = parseFloat(comparison.prices.cinemaworld);
+        const fwPrice = parseFloat(comparison.prices.filmworld);
+        comparison.cheapestProvider = cwPrice <= fwPrice ? 'cinemaworld' : 'filmworld';
+      } else if (comparison.prices.cinemaworld) {
+        comparison.cheapestProvider = 'cinemaworld';
+      } else if (comparison.prices.filmworld) {
+        comparison.cheapestProvider = 'filmworld';
+      }
+      
+      comparisons.push(comparison);
     });
-  }, [data]);
+    
+    // Fill in any movies we haven't processed yet from provider lists
+    // Build a set of titles we've already processed
+    const processedTitles = new Set(comparisons.map(m => m.title.toLowerCase()));
+    
+    // Process any movies from providers that weren't in the comparison groups
+    Object.entries(providerMovies).forEach(([provider, movies]) => {
+      movies.forEach(movie => {
+        if (!processedTitles.has(movie.Title.toLowerCase())) {
+          // Get the provider name in lowercase for consistency
+          const providerKey = provider.toLowerCase();
+          const providerForKey = providerKey.includes('cinema') ? 'cinemaworld' : 'filmworld';
+          
+          // Try to find movie details if available
+          const detailKey = `${provider}-${movie.Id}`;
+          const detail = movieDetails[detailKey];
+          
+          const comparison: MovieComparison = {
+            id: movie.Id,
+            title: movie.Title,
+            year: String(movie.Year),
+            poster: movie.Poster,
+            prices: {
+              cinemaworld: providerForKey === 'cinemaworld' && movie.Price !== undefined ? 
+                movie.Price.toString() : undefined,
+              filmworld: providerForKey === 'filmworld' && movie.Price !== undefined ? 
+                movie.Price.toString() : undefined
+            },
+            cheapestProvider: providerForKey // Only one provider so it's the cheapest
+          };
+          
+          comparisons.push(comparison);
+          processedTitles.add(movie.Title.toLowerCase());
+        }
+      });
+    });
+    
+    return comparisons;
+  }, [providerMovies, movieDetails, priceComparisons]);
 
   // Filter and sort movies based on user input
   const filteredAndSortedMovies = React.useMemo(() => {
@@ -103,6 +152,13 @@ const MoviesPage: React.FC = () => {
     return result;
   }, [processedMovies, searchTerm, sortBy]);
 
+  // Function to retry fetching if needed
+  const refetch = () => {
+    // Our SSE endpoint will automatically reconnect,
+    // but we can force a page reload as a fallback
+    window.location.reload();
+  };
+
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
@@ -128,9 +184,9 @@ const MoviesPage: React.FC = () => {
 
       <MovieGrid
         movies={filteredAndSortedMovies}
-        isLoading={isLoading}
-        isError={isError}
-        error={error as Error}
+        isLoading={loading}
+        isError={!!error}
+        error={error ? new Error(error) : null}
         refetch={refetch}
       />
     </div>

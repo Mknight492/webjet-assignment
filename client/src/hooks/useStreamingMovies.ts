@@ -1,42 +1,42 @@
 import { useState, useEffect } from 'react';
-import { Movie, MovieDetails, ServiceResponse } from '../types';
+import { Movie, MovieDetail, ServiceResponse } from '../types';
 
 export const useStreamingMovies = () => {
   const [providerMovies, setProviderMovies] = useState<Record<string, Movie[]>>({});
-  const [movieDetails, setMovieDetails] = useState<Record<string, MovieDetails>>({});
+  const [movieDetails, setMovieDetails] = useState<Record<string, MovieDetail>>({});
   const [priceComparisons, setPriceComparisons] = useState<Movie[][]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const eventSource = new EventSource(`${process.env.REACT_APP_API_URL || 'https://localhost:7168/api'}/movies/stream`);
+    const eventSource = new EventSource(`${process.env.REACT_APP_API_URL || 'https://localhost:7168/api'}/Movies/stream`);
     
     eventSource.onmessage = (event) => {
       try {
         const response = JSON.parse(event.data);
-        
-        if (response.success && response.data) {
-          if (response.source === 'PriceComparison') {
+        console.log(response);
+        if (response.Success && response.Data) {
+          if (response.Source === 'PriceComparison') {
             // This is a price comparison group
-            setPriceComparisons(prev => [...prev, response.data]);
-          } else if (response.source.endsWith('Details')) {
-            // This is movie details from a provider - now it's a MovieDetails object
-            const movieDetail = response.data;
-            const provider = response.source.replace('Details', '');
+            setPriceComparisons(prev => [...prev, response.Data]);
+          } else if (response.Source.endsWith('Details')) {
+            // This is movie details from a provider
+            const movieDetail = response.Data;
+            const provider = response.Source.replace('Details', '');
             
             setMovieDetails(prev => ({
               ...prev,
-              [`${provider}-${movieDetail.id}`]: movieDetail
+              [`${provider}-${movieDetail.Id}`]: movieDetail
             }));
           } else {
             // This is a provider's movie list
             setProviderMovies(prev => ({
               ...prev,
-              [response.source]: response.data
+              [response.Source]: response.Data
             }));
           }
         } else {
-          console.warn(`Error from ${response.source}: ${response.message}`);
+          console.warn(`Error from ${response.Source}: ${response.Message}`);
         }
       } catch (err) {
         console.error('Failed to parse SSE data', err);

@@ -1,15 +1,12 @@
 // Movie type as returned by the movie list endpoint
 export interface Movie {
-  ID: string;
+  Id: string;
   Title: string;
-  Year: string;
-  Poster?: string;
+  Year: number;
   Type?: string;
-  Price?: string;
-}
-
-// Movie details type as returned by the movie details endpoint
-export interface MovieDetail extends Movie {
+  Poster?: string;
+  Provider: string;
+  Plot?: string;
   Rated?: string;
   Released?: string;
   Runtime?: string;
@@ -17,13 +14,13 @@ export interface MovieDetail extends Movie {
   Director?: string;
   Writer?: string;
   Actors?: string;
-  Plot?: string;
-  Language?: string;
-  Country?: string;
-  Awards?: string;
-  Metascore?: string;
-  imdbRating?: string;
-  Price: string;
+  Price?: number;
+}
+
+// Movie details type as returned by the movie details endpoint
+export interface MovieDetail extends Omit<Movie, 'Price'> {
+  Rating?: string;
+  Price: number; // Required in MovieDetails
 }
 
 // Movie with price comparison information

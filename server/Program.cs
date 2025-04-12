@@ -4,6 +4,10 @@ using System.Text.Json.Serialization;
 using MoviePriceComparison.Configuration;
 using MoviePriceComparison.Services;
 using MoviePriceComparison.Services.Interfaces;
+using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi.Writers;
+using Swashbuckle.AspNetCore.Swagger;
+using System.IO;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -50,9 +54,22 @@ builder.Services.AddHttpLogging(logging =>
                             HttpLoggingFields.ResponseStatusCode;
 });
 
-// Add OpenAPI/Swagger
+// Add OpenAPI/Swagger with enhanced configuration
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "Movie Price Comparison API",
+        Version = "v1",
+        Description = "A BFF API for movie price comparison between providers",
+        Contact = new OpenApiContact
+        {
+            Name = "API Support",
+            Email = "support@example.com"
+        }
+    });
+});
 
 // Add caching
 builder.Services.AddResponseCaching();
@@ -64,6 +81,25 @@ builder.Services.AddTransient<IMovieAggregatorService, MovieAggregatorService>()
 
 var app = builder.Build();
 
+// Generate and save OpenAPI specification file
+var openApiFilePath = Path.Combine(AppContext.BaseDirectory, "openapi.json");
+using (var serviceScope = app.Services.CreateScope())
+{
+    var services = serviceScope.ServiceProvider;
+    var swaggerProvider = services.GetRequiredService<ISwaggerProvider>();
+    var swagger = swaggerProvider.GetSwagger("v1");
+
+    using (var fileStream = File.Create(openApiFilePath))
+    using (var textWriter = new StreamWriter(fileStream))
+    {
+        // OpenApiJsonWriter doesn't implement IDisposable, so don't use it in a using statement
+        var jsonWriter = new OpenApiJsonWriter(textWriter);
+        swagger.SerializeAsV3(jsonWriter);
+    }
+
+    app.Logger.LogInformation($"OpenAPI specification saved to: {openApiFilePath}");
+}
+
 // Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())
 {
@@ -74,9 +110,10 @@ if (app.Environment.IsDevelopment())
 
 if (!app.Environment.IsDevelopment())
 {
-    app.UseHttpsRedirection();
+    // app.UseHttpsRedirection();
 }
 
+app.UseHttpsRedirection();
 app.UseCors("CorsPolicy");
 app.UseResponseCaching();
 
