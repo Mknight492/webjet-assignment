@@ -14,15 +14,13 @@ export const useStreamingMovies = () => {
     eventSource.onmessage = (event) => {
       try {
         const response = JSON.parse(event.data);
-        console.log(response);
-        if (response.Success && response.Data) {
-          if (response.Source === 'PriceComparison') {
-            // This is a price comparison group
-            setPriceComparisons(prev => [...prev, response.Data]);
-          } else if (response.Source.endsWith('Details')) {
+        if (response.success && response.data) {
+          console.log(response.da);
+          if (response.source.endsWith('Details')) {
             // This is movie details from a provider
-            const movieDetail = response.Data;
-            const provider = response.Source.replace('Details', '');
+            const movieDetail = response.data;
+            console.log("movieDetail", movieDetail);
+            const provider = response.source.replace('Details', '');
             
             setMovieDetails(prev => ({
               ...prev,
@@ -30,13 +28,14 @@ export const useStreamingMovies = () => {
             }));
           } else {
             // This is a provider's movie list
+            // console.log(response.data);
             setProviderMovies(prev => ({
               ...prev,
-              [response.Source]: response.Data
+              [response.source]: response.data
             }));
           }
         } else {
-          console.warn(`Error from ${response.Source}: ${response.Message}`);
+          console.warn(`Error from ${response.source}: ${response.message}`);
         }
       } catch (err) {
         console.error('Failed to parse SSE data', err);

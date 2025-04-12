@@ -1,20 +1,20 @@
 // Movie type as returned by the movie list endpoint
 export interface Movie {
-  Id: string;
-  Title: string;
-  Year: number;
-  Type?: string;
-  Poster?: string;
-  Provider: string;
-  Plot?: string;
-  Rated?: string;
-  Released?: string;
-  Runtime?: string;
-  Genre?: string;
-  Director?: string;
-  Writer?: string;
-  Actors?: string;
-  Price?: number;
+  id: string;
+  title: string;
+  year: number;
+  type?: string;
+  poster?: string;
+  provider: string;
+  plot?: string;
+  rated?: string;
+  released?: string;
+  runtime?: string;
+  genre?: string;
+  director?: string;
+  writer?: string;
+  actors?: string;
+  price?: number;
 }
 
 // Movie details type as returned by the movie details endpoint
