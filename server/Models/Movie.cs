@@ -10,6 +10,17 @@ public class Movie
     public string Poster { get; set; } = string.Empty;
     public string Provider { get; set; } = string.Empty; // "Cinemaworld" or "Filmworld"
     
+    // Additional properties from MovieDetails
+    public string? Plot { get; set; }
+    public string? Rated { get; set; }
+    public string? Released { get; set; }
+    public string? Runtime { get; set; }
+    public string? Genre { get; set; }
+    public string? Director { get; set; }
+    public string? Writer { get; set; }
+    public string? Actors { get; set; }
+    public decimal? Price { get; set; }
+    
     // Create a Movie from a MovieItem response
     public static Movie FromMovieItem(MovieItem item, string provider)
     {

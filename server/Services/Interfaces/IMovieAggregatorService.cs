@@ -14,4 +14,7 @@ public interface IMovieAggregatorService
     /// </summary>
     /// <param name="id">The movie ID (includes provider prefix)</param>
     Task<ServiceResponse<MovieDetails>> GetMovieDetailsAsync(string id);
+    
+    // Update to include separate types for different data
+    IAsyncEnumerable<object> StreamMoviesAsync(CancellationToken cancellationToken = default);
 } 
