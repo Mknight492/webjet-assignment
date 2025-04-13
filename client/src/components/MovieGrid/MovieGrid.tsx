@@ -1,5 +1,4 @@
 import React from "react";
-import { Link } from "react-router-dom";
 import { MovieComparison } from "../../types/Movie";
 
 interface MovieGridProps {
@@ -62,7 +61,7 @@ const MovieGrid: React.FC<MovieGridProps> = ({
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
       {movies.map(movie => (
-        <Link to={`/movie/${getMovieUrl(movie.title)}`} key={movie.title} className="bg-white rounded-lg shadow-md overflow-hidden transition-transform duration-200 hover:shadow-lg hover:-translate-y-1">
+        <div key={movie.title} className="bg-white rounded-lg shadow-md overflow-hidden transition-transform duration-200 hover:shadow-lg hover:-translate-y-1">
           <div className="relative pb-[150%]">
             {movie.poster ? (
               <img src={movie.poster} alt={movie.title} className="absolute h-full w-full object-cover" />
@@ -108,7 +107,7 @@ const MovieGrid: React.FC<MovieGridProps> = ({
               </div>
             </div>
           </div>
-        </Link>
+        </div>
       ))}
     </div>
   );
