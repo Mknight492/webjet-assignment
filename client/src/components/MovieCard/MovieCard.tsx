@@ -8,9 +8,10 @@ interface MovieCardProps {
 }
 
 const MovieCard: React.FC<MovieCardProps> = ({ movie }) => {
-  const { title, year, poster, prices, priceLoadingStates, cheapestProvider } = movie;
-  
-  const renderPrice = (provider: 'cinemaworld' | 'filmworld') => {
+  const { title, year, poster, prices, priceLoadingStates, cheapestProvider } =
+    movie;
+
+  const renderPrice = (provider: "cinemaworld" | "filmworld") => {
     if (priceLoadingStates[provider]) {
       return (
         <div className="flex items-center">
@@ -18,18 +19,18 @@ const MovieCard: React.FC<MovieCardProps> = ({ movie }) => {
         </div>
       );
     }
-    
+
     if (prices[provider]) {
-      const isLowest = cheapestProvider === provider && 
-        prices.cinemaworld && prices.filmworld; // Only highlight if both prices exist
-      
+      const isLowest =
+        cheapestProvider === provider && prices.cinemaworld && prices.filmworld; // Only highlight if both prices exist
+
       return (
-        <span className={`font-semibold ${isLowest ? 'text-green-600' : ''}`}>
+        <span className={`font-semibold ${isLowest ? "text-green-600" : ""}`}>
           ${prices[provider]}
         </span>
       );
     }
-    
+
     return <span className="text-gray-400">Unavailable</span>;
   };
 
@@ -65,11 +66,11 @@ const MovieCard: React.FC<MovieCardProps> = ({ movie }) => {
         <div className="mt-2 space-y-1">
           <div className="flex justify-between text-sm">
             <span className="text-gray-600">Cinemaworld:</span>
-            {renderPrice('cinemaworld')}
+            {renderPrice("cinemaworld")}
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-gray-600">Filmworld:</span>
-            {renderPrice('filmworld')}
+            {renderPrice("filmworld")}
           </div>
         </div>
 
@@ -85,4 +86,4 @@ const MovieCard: React.FC<MovieCardProps> = ({ movie }) => {
   );
 };
 
-export default MovieCard; 
+export default MovieCard;

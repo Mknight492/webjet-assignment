@@ -93,23 +93,36 @@ public class MovieAggregatorService : IMovieAggregatorService
             if (!processedProviders.Contains(providerName))
             {
                 processedProviders.Add(providerName);
-                _logger.LogInformation("Streaming movies from {Provider}", providerName);
                 
                 // Store movies for later details fetching
                 if (result.Success && result.Data != null)
                 {
+                    int movieCount = result.Data.Count;
+                    _logger.LogInformation("Received {Count} movies from {Provider}", movieCount, providerName);
+                    
                     foreach (var movie in result.Data)
                     {
                         allMoviesById[movie.Id] = movie;
                     }
+                }
+                else
+                {
+                    _logger.LogWarning("Provider {Provider} returned unsuccessful result: {Message}", 
+                        providerName, result.Message);
                 }
                 
                 yield return result;
             }
         }
         
-        // Now fetch and stream details for each movie in parallel (up to 10 at once)
+        _logger.LogInformation("Total unique movies collected: {Count}", allMoviesById.Count);
+        
+        // Now fetch and stream details for each movie in parallel
         _logger.LogInformation("Streaming movie details for {Count} movies", allMoviesById.Count);
+        
+        // Create a counter for completed movie details
+        var completedDetailsCount = 0;
+        var successfulDetailsCount = 0;
         
         // Use our resilience service to process movies in parallel with yield return
         var channel = System.Threading.Channels.Channel.CreateUnbounded<ServiceResponse<MovieDetails>>();
@@ -130,8 +143,27 @@ public class MovieAggregatorService : IMovieAggregatorService
                     
                     if (service != null)
                     {
-                        return await FetchMovieDetailsAsync(service, movieId, providerName);
+                        var result = await FetchMovieDetailsAsync(service, movieId, providerName);
+                        Interlocked.Increment(ref completedDetailsCount);
+                        
+                        if (result != null && result.Success)
+                        {
+                            Interlocked.Increment(ref successfulDetailsCount);
+                            _logger.LogInformation("Successfully fetched details for movie {Id} ({Title}) - Progress: {Completed}/{Total}", 
+                                movieId, result.Data?.Title ?? "Unknown", completedDetailsCount, allMoviesById.Count);
+                        }
+                        else
+                        {
+                            _logger.LogWarning("Failed to fetch details for movie {Id} from {Provider} - Progress: {Completed}/{Total}", 
+                                movieId, providerName, completedDetailsCount, allMoviesById.Count);
+                        }
+                        
+                        return result;
                     }
+                    
+                    Interlocked.Increment(ref completedDetailsCount);
+                    _logger.LogWarning("No service found for provider {Provider} for movie {Id} - Progress: {Completed}/{Total}", 
+                        providerName, movieId, completedDetailsCount, allMoviesById.Count);
                     
                     return null;
                 },
@@ -150,13 +182,20 @@ public class MovieAggregatorService : IMovieAggregatorService
         });
         
         // Read from the channel and yield results as they come in
+        var detailsYielded = 0;
         await foreach (var detailsResponse in channel.Reader.ReadAllAsync(cancellationToken))
         {
+            detailsYielded++;
+            _logger.LogInformation("Yielding movie details for {Title} - {Yielded} details yielded", 
+                detailsResponse.Data?.Title ?? "Unknown", detailsYielded);
             yield return detailsResponse;
         }
         
         // Wait for the processing task to complete
         await processingTask;
+        
+        _logger.LogInformation("Movie details processing complete. Processed {Completed}/{Total}, Successful: {Success}, Yielded: {Yielded}", 
+            completedDetailsCount, allMoviesById.Count, successfulDetailsCount, detailsYielded);
         
         // The price comparison will now be handled by the frontend
         _logger.LogInformation("Completed streaming movies and details. Price comparison will be handled by frontend.");

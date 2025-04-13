@@ -3,6 +3,7 @@ import MovieGrid from "../../components/MovieGrid";
 import FilterControls from "../../components/FilterControls";
 import { useStreamingMovies } from "../../hooks/useStreamingMovies";
 import { Movie, MovieComparison, MovieDetail } from "../../types/Movie";
+import { Link } from "react-router-dom";
 
 const MoviesPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -17,84 +18,38 @@ const MoviesPage: React.FC = () => {
     hasPartialData 
   } = useStreamingMovies();
   
+  console.log("movieDetails", movieDetails);
+  console.log("providerMovies", providerMovies);
+ 
+
   // Transform the streaming data into MovieComparison objects
   const processedMovies: MovieComparison[] = React.useMemo(() => {
-    // Start with the price comparison groups which have the most complete data
-    const comparisons: MovieComparison[] = [];
+    // Create a map to track movies by title (normalized to lowercase)
+    const moviesByTitle: Record<string, MovieComparison> = {};
     
-    // Process price comparison groups first (highest quality data)
-    priceComparisons.forEach(movieGroup => {
-      if (movieGroup.length === 0) return;
-      
-      // Group should contain the same movie from different providers
-      const firstMovie = movieGroup[0];
-      
-      const comparison: MovieComparison = {
-        id: firstMovie.id,
-        title: firstMovie.title,
-        year: String(firstMovie.year),
-        poster: firstMovie.poster,
-        prices: {
-          cinemaworld: undefined,
-          filmworld: undefined
-        },
-        priceLoadingStates: {
-          cinemaworld: true,
-          filmworld: true
-        },
-        cheapestProvider: null
-      };
-      
-      // Add prices from each provider - only the MovieDetail objects would have prices
-      movieGroup.forEach(movie => {
-        const movieId = `${movie.provider}-${movie.id}`;
-        const detail = movieDetails[movieId];
-        const provider = movie.provider.toLowerCase();
+    // Get set of all unique movie titles from all providers
+    const availableMovies = new Set(Object.values(providerMovies).flat().map(movie => movie.title));
+    
+    // Process each unique movie title
+    Array.from(availableMovies).forEach(title => {
+      // Find this movie across all providers
+      Object.entries(providerMovies).forEach(([provider, movies]) => {
+        const movie = movies.find(m => m.title === title);
+        if (!movie) return;
         
-        if (provider.toLowerCase() === 'cinemaworld') {
-          if (detail?.price !== undefined) {
-            comparison.prices.cinemaworld = detail.price.toString();
-            comparison.priceLoadingStates.cinemaworld = false;
-          }
-        } else if (provider.toLowerCase() === 'filmworld') {
-          if (detail?.price !== undefined) {
-            comparison.prices.filmworld = detail.price.toString();
-            comparison.priceLoadingStates.filmworld = false;
-          }
-        }
-      });
-      
-      // Determine cheapest provider
-      if (comparison.prices.cinemaworld && comparison.prices.filmworld) {
-        const cwPrice = parseFloat(comparison.prices.cinemaworld);
-        const fwPrice = parseFloat(comparison.prices.filmworld);
-        comparison.cheapestProvider = cwPrice <= fwPrice ? 'cinemaworld' : 'filmworld';
-      } else if (comparison.prices.cinemaworld) {
-        comparison.cheapestProvider = 'cinemaworld';
-      } else if (comparison.prices.filmworld) {
-        comparison.cheapestProvider = 'filmworld';
-      }
-      
-      comparisons.push(comparison);
-    });
-    
-    // Fill in any movies we haven't processed yet from provider lists
-    // Build a set of titles we've already processed
-    const processedTitles = new Set(comparisons.map(m => m.title.toLowerCase()));
-    
-    // Process any movies from providers that weren't in the comparison groups
-    Object.entries(providerMovies).forEach(([provider, movies]) => {
-      movies.forEach(movie => {
-        if (!processedTitles.has(movie.title.toLowerCase())) {
-          // Get the provider name in lowercase for consistency
-          const providerKey = provider.toLowerCase();
-          const providerForKey = providerKey.includes('cinema') ? 'cinemaworld' : 'filmworld';
-          
-          // Try to find movie details if available
-          const detailKey = `${provider}-${movie.id}`;
-          const detail = movieDetails[detailKey];
-          
-          const comparison: MovieComparison = {
+        const normalizedTitle = title.toLowerCase();
+        
+        // Get the provider name in lowercase for consistency
+        const providerKey = provider.toLowerCase();
+        const providerForKey = providerKey.includes('cinema') ? 'cinemaworld' : 'filmworld';
+        
+        // Try to find movie details if available
+        const detailKey = `${provider}-${movie.id}`;
+        const detail = movieDetails[detailKey];
+        
+        // Create new movie comparison object if it doesn't exist yet
+        if (!moviesByTitle[normalizedTitle]) {
+          moviesByTitle[normalizedTitle] = {
             id: movie.id,
             title: movie.title,
             year: String(movie.year),
@@ -104,32 +59,52 @@ const MoviesPage: React.FC = () => {
               filmworld: undefined
             },
             priceLoadingStates: {
-              cinemaworld: providerForKey === 'cinemaworld',
-              filmworld: providerForKey === 'filmworld'
+              cinemaworld: false,
+              filmworld: false
             },
-            cheapestProvider: providerForKey // Only one provider so it's the cheapest
+            cheapestProvider: null
           };
-          
-          // Update price if we have it
-          if (detail?.price !== undefined) {
-            if (providerForKey === 'cinemaworld') {
-              comparison.prices.cinemaworld = detail.price.toString();
-              comparison.priceLoadingStates.cinemaworld = false;
-            } else if (providerForKey === 'filmworld') {
-              comparison.prices.filmworld = detail.price.toString();
-              comparison.priceLoadingStates.filmworld = false;
-            }
+        }
+        
+        // Update price if we have it
+        const comparison = moviesByTitle[normalizedTitle];
+        
+        // Set loading state for this provider
+        if (providerForKey === 'cinemaworld') {
+          comparison.priceLoadingStates.cinemaworld = !detail;
+        } else if (providerForKey === 'filmworld') {
+          comparison.priceLoadingStates.filmworld = !detail;
+        }
+        
+        // Update price if available
+        if (detail?.price !== undefined) {
+          if (providerForKey === 'cinemaworld') {
+            comparison.prices.cinemaworld = detail.price.toString();
+          } else if (providerForKey === 'filmworld') {
+            comparison.prices.filmworld = detail.price.toString();
           }
-          
-          comparisons.push(comparison);
-          processedTitles.add(movie.title.toLowerCase());
         }
       });
     });
     
-    return comparisons;
+    // Calculate cheapest provider for each movie
+    Object.values(moviesByTitle).forEach(movie => {
+      if (movie.prices.cinemaworld && movie.prices.filmworld) {
+        const cwPrice = parseFloat(movie.prices.cinemaworld);
+        const fwPrice = parseFloat(movie.prices.filmworld);
+        movie.cheapestProvider = cwPrice <= fwPrice ? 'cinemaworld' : 'filmworld';
+      } else if (movie.prices.cinemaworld) {
+        movie.cheapestProvider = 'cinemaworld';
+      } else if (movie.prices.filmworld) {
+        movie.cheapestProvider = 'filmworld';
+      }
+    });
+    
+    return Object.values(moviesByTitle);
   }, [providerMovies, movieDetails, priceComparisons]);
 
+  console.log("processedMovies", processedMovies);
+  
   // Filter and sort movies based on user input
   const filteredAndSortedMovies = React.useMemo(() => {
     let result = [...processedMovies];
@@ -186,6 +161,11 @@ const MoviesPage: React.FC = () => {
     
     return result;
   }, [processedMovies, searchTerm, sortBy]);
+
+  // Function to generate URL-safe movie titles
+  const getMovieUrl = (title: string) => {
+    return encodeURIComponent(title);
+  };
 
   // Function to retry fetching if needed
   const refetch = () => {
@@ -278,6 +258,7 @@ const MoviesPage: React.FC = () => {
           isError={false}
           error={error}
           refetch={refetch}
+          getMovieUrl={getMovieUrl}
         />
       )}
     </div>
