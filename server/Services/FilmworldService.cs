@@ -57,7 +57,7 @@ public class FilmworldService : IMovieService
             
             var serviceResponse = ServiceResponse<List<Movie>>.FromSuccess(movies, ProviderName);
             
-            // Store in cache
+            // Only cache successful responses
             _cache.Set(cacheKey, serviceResponse, _cacheOptions.MoviesCacheDuration);
             _logger.LogInformation("Cached movies for {ProviderName} for {Duration}", 
                 ProviderName, _cacheOptions.MoviesCacheDuration);
@@ -95,7 +95,7 @@ public class FilmworldService : IMovieService
             var movieDetails = MovieDetails.FromMovieDetailsResponse(response, ProviderName);
             var serviceResponse = ServiceResponse<MovieDetails>.FromSuccess(movieDetails, ProviderName);
             
-            // Store in cache
+            // Only cache successful responses
             _cache.Set(cacheKey, serviceResponse, _cacheOptions.MovieDetailsCacheDuration);
             _logger.LogInformation("Cached movie details for {ProviderName}, ID: {Id} for {Duration}", 
                 ProviderName, id, _cacheOptions.MovieDetailsCacheDuration);
