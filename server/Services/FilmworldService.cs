@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Caching.Memory;
 using MoviePriceComparison.Configuration;
 using MoviePriceComparison.Models;
 using MoviePriceComparison.Services.Interfaces;
@@ -11,21 +12,35 @@ public class FilmworldService : IMovieService
     private readonly HttpClient _httpClient;
     private readonly ILogger<FilmworldService> _logger;
     private readonly MovieApiOptions _options;
+    private readonly IMemoryCache _cache;
+    private readonly CacheOptions _cacheOptions;
     
     public string ProviderName => "Filmworld";
     
     public FilmworldService(
         IHttpClientFactory httpClientFactory,
         ILogger<FilmworldService> logger,
-        IOptions<MovieApiOptions> options)
+        IOptions<MovieApiOptions> options,
+        IMemoryCache cache,
+        IOptions<CacheOptions> cacheOptions)
     {
         _httpClient = httpClientFactory.CreateClient("Filmworld");
         _logger = logger;
         _options = options.Value;
+        _cache = cache;
+        _cacheOptions = cacheOptions.Value;
     }
     
     public async Task<ServiceResponse<List<Movie>>> GetMoviesAsync()
     {
+        // Try to get from cache first
+        string cacheKey = $"{ProviderName}_Movies";
+        if (_cache.TryGetValue(cacheKey, out ServiceResponse<List<Movie>> cachedResponse))
+        {
+            _logger.LogInformation("Retrieved movies from cache for {ProviderName}", ProviderName);
+            return cachedResponse;
+        }
+        
         try
         {
             _logger.LogInformation("Fetching movies from Filmworld API");
@@ -40,7 +55,14 @@ public class FilmworldService : IMovieService
                 .Select(m => Movie.FromMovieItem(m, ProviderName))
                 .ToList();
             
-            return ServiceResponse<List<Movie>>.FromSuccess(movies, ProviderName);
+            var serviceResponse = ServiceResponse<List<Movie>>.FromSuccess(movies, ProviderName);
+            
+            // Store in cache
+            _cache.Set(cacheKey, serviceResponse, _cacheOptions.MoviesCacheDuration);
+            _logger.LogInformation("Cached movies for {ProviderName} for {Duration}", 
+                ProviderName, _cacheOptions.MoviesCacheDuration);
+                
+            return serviceResponse;
         }
         catch (Exception ex)
         {
@@ -51,6 +73,15 @@ public class FilmworldService : IMovieService
     
     public async Task<ServiceResponse<MovieDetails>> GetMovieDetailsAsync(string id)
     {
+        // Try to get from cache first
+        string cacheKey = $"{ProviderName}_Movie_{id}";
+        if (_cache.TryGetValue(cacheKey, out ServiceResponse<MovieDetails> cachedResponse))
+        {
+            _logger.LogInformation("Retrieved movie details from cache for {ProviderName}, ID: {Id}", 
+                ProviderName, id);
+            return cachedResponse;
+        }
+        
         try
         {
             _logger.LogInformation("Fetching movie details from Filmworld API for ID: {Id}", id);
@@ -62,8 +93,14 @@ public class FilmworldService : IMovieService
             }
             
             var movieDetails = MovieDetails.FromMovieDetailsResponse(response, ProviderName);
+            var serviceResponse = ServiceResponse<MovieDetails>.FromSuccess(movieDetails, ProviderName);
             
-            return ServiceResponse<MovieDetails>.FromSuccess(movieDetails, ProviderName);
+            // Store in cache
+            _cache.Set(cacheKey, serviceResponse, _cacheOptions.MovieDetailsCacheDuration);
+            _logger.LogInformation("Cached movie details for {ProviderName}, ID: {Id} for {Duration}", 
+                ProviderName, id, _cacheOptions.MovieDetailsCacheDuration);
+                
+            return serviceResponse;
         }
         catch (Exception ex)
         {

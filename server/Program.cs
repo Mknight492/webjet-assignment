@@ -26,6 +26,13 @@ builder.Services.AddControllers()
 builder.Services.Configure<MovieApiOptions>(
     builder.Configuration.GetSection("MovieApi"));
 
+// Add configuration for caching
+builder.Services.Configure<CacheOptions>(
+    builder.Configuration.GetSection("Cache"));
+
+// Add memory cache
+builder.Services.AddMemoryCache();
+
 // By default, we want all HttpClient instances to include the StandardResilienceHandler.
 builder.Services.ConfigureHttpClientDefaults(builder => builder.AddStandardResilienceHandler(options => {
   options.Retry = new HttpRetryStrategyOptions
