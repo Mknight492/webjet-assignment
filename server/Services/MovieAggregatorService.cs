@@ -173,7 +173,14 @@ public class MovieAggregatorService : IMovieAggregatorService
                 {
                     if (result != null)
                     {
+                      try{
                         await channel.Writer.WriteAsync(result, cancellationToken);
+                      } 
+                      catch (OperationCanceledException)
+                      {
+                          _logger.LogInformation("Channel writer was canceled while writing movie details for {Title}", 
+                              result.Data?.Title ?? "Unknown");
+                      }
                     }
                 });
                 
