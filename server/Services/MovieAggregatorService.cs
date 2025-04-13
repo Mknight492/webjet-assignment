@@ -33,36 +33,79 @@ public class MovieAggregatorService : IMovieAggregatorService
     {
         _logger.LogInformation("Starting to stream movies from all providers");
         
-        // First stream movies from whichever provider responds first
-        var providerTasks = _movieServices.ToDictionary(
-            service => service.ProviderName,
-            service => service.GetMoviesAsync()
-        );
-        
+        // Dictionary to track which providers we've already processed
+        var processedProviders = new HashSet<string>();
         var allMoviesById = new Dictionary<string, Movie>();
         
-        // Wait for any task to complete and immediately yield its result
+        // Create a resilient task for each provider
+        var providerTasks = new List<Task<(string ProviderName, ServiceResponse<List<Movie>> Result)>>();
+        
+        foreach (var service in _movieServices)
+        {
+            // Use our resilience service to add retry capabilities
+            var task = Task.Run(async () =>
+            {
+                // Use Polly directly with the service name for better control over retries
+                var policy = Policy<ServiceResponse<List<Movie>>>
+                    .Handle<Exception>()
+                    .OrResult(response => !response.Success)  // Also retry on unsuccessful responses
+                    .WaitAndRetryAsync(
+                        _resilienceService.Options.MaxRetries,
+                        retryAttempt => TimeSpan.FromMilliseconds(
+                            _resilienceService.Options.InitialRetryDelayMs * 
+                            Math.Pow(_resilienceService.Options.RetryBackoffFactor, retryAttempt)),
+                        (outcome, timeSpan, retryCount, context) =>
+                        {
+                            if (outcome.Exception != null)
+                            {
+                                _logger.LogWarning(outcome.Exception, 
+                                    "Error fetching movies from {Provider}, retry attempt {RetryCount} after {Delay}ms",
+                                    service.ProviderName, retryCount, timeSpan.TotalMilliseconds);
+                            }
+                            else
+                            {
+                                _logger.LogWarning(
+                                    "Unsuccessful response from {Provider}, retry attempt {RetryCount} after {Delay}ms: {ErrorMessage}",
+                                    service.ProviderName, retryCount, timeSpan.TotalMilliseconds, 
+                                    outcome.Result?.Message ?? "Unknown error");
+                            }
+                        });
+                
+                // Execute with the retry policy but don't yield until all retries are done
+                var result = await policy.ExecuteAsync(() => service.GetMoviesAsync());
+                
+                return (service.ProviderName, result);
+            });
+            
+            providerTasks.Add(task);
+        }
+        
+        // Process results as they come in
         while (providerTasks.Count > 0 && !cancellationToken.IsCancellationRequested)
         {
-            var completedTask = await Task.WhenAny(providerTasks.Values);
+            // Wait for any task to complete
+            var completedTask = await Task.WhenAny(providerTasks);
+            providerTasks.Remove(completedTask);
             
-            // Find which provider this task belongs to
-            var providerName = providerTasks.First(kv => kv.Value == completedTask).Key;
-            providerTasks.Remove(providerName);
+            // Process the result
+            var (providerName, result) = await completedTask;
             
-            var result = await completedTask;
-            _logger.LogInformation("Streaming movies from {Provider}", providerName);
-            
-            // Store movies for later details fetching
-            if (result.Success && result.Data != null)
+            if (!processedProviders.Contains(providerName))
             {
-                foreach (var movie in result.Data)
+                processedProviders.Add(providerName);
+                _logger.LogInformation("Streaming movies from {Provider}", providerName);
+                
+                // Store movies for later details fetching
+                if (result.Success && result.Data != null)
                 {
-                    allMoviesById[movie.Id] = movie;
+                    foreach (var movie in result.Data)
+                    {
+                        allMoviesById[movie.Id] = movie;
+                    }
                 }
+                
+                yield return result;
             }
-            
-            yield return result;
         }
         
         // Now fetch and stream details for each movie in parallel (up to 10 at once)
@@ -115,31 +158,8 @@ public class MovieAggregatorService : IMovieAggregatorService
         // Wait for the processing task to complete
         await processingTask;
         
-        // Now collect all movies and return price information for each
-        var allMovies = allMoviesById.Values.ToList();
-        
-        // Group by title (or another identifier that would match across providers)
-        var movieGroups = allMovies.GroupBy(m => m.Title);
-        
-        // Return each group as a price comparison
-        foreach (var group in movieGroups)
-        {
-            if (cancellationToken.IsCancellationRequested)
-                break;
-                
-            var movies = group.ToList();
-            _logger.LogInformation("Streaming price comparison for: {Title}", group.Key);
-            
-            yield return ServiceResponse<List<Movie>>.FromSuccess(
-                movies, 
-                "PriceComparison", 
-                false);
-            
-            // Add a small delay to avoid overwhelming the client
-            await Task.Delay(100, cancellationToken);
-        }
-        
-        _logger.LogInformation("Completed streaming movies, details, and price comparisons");
+        // The price comparison will now be handled by the frontend
+        _logger.LogInformation("Completed streaming movies and details. Price comparison will be handled by frontend.");
     }
 
     // Helper method to fetch movie details inside a try-catch block

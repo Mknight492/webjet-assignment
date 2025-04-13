@@ -11,6 +11,8 @@ namespace MoviePriceComparison.Services;
 
 public interface IResilienceService
 {
+    ResilienceOptions Options { get; }
+    
     Task<IEnumerable<TResult>> ExecuteInParallelWithResilienceAsync<TItem, TResult>(
         IEnumerable<TItem> items,
         Func<TItem, CancellationToken, Task<TResult>> itemProcessor,
@@ -36,6 +38,8 @@ public class ResilienceService : IResilienceService
         _options = options.Value;
         _logger = logger;
     }
+
+    public ResilienceOptions Options => _options;
 
     public async Task<IEnumerable<TResult>> ExecuteInParallelWithResilienceAsync<TItem, TResult>(
         IEnumerable<TItem> items,
