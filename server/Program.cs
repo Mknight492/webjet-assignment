@@ -79,6 +79,12 @@ builder.Services.AddTransient<IMovieService, CinemaworldService>();
 builder.Services.AddTransient<IMovieService, FilmworldService>();
 builder.Services.AddTransient<IMovieAggregatorService, MovieAggregatorService>();
 
+// Register ResilienceOptions from configuration
+builder.Services.Configure<ResilienceOptions>(builder.Configuration.GetSection("Resilience"));
+
+// Register the ResilienceService
+builder.Services.AddSingleton<IResilienceService, ResilienceService>();
+
 var app = builder.Build();
 
 // Generate and save OpenAPI specification file

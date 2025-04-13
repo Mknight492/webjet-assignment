@@ -16,98 +16,16 @@ public class MovieAggregatorService : IMovieAggregatorService
 {
     private readonly IEnumerable<IMovieService> _movieServices;
     private readonly ILogger<MovieAggregatorService> _logger;
+    private readonly IResilienceService _resilienceService;
     
     public MovieAggregatorService(
         IEnumerable<IMovieService> movieServices,
-        ILogger<MovieAggregatorService> logger)
+        ILogger<MovieAggregatorService> logger,
+        IResilienceService resilienceService)
     {
         _movieServices = movieServices;
         _logger = logger;
-    }
-    
-    public async Task<ServiceResponse<List<Movie>>> GetAllMoviesAsync()
-    {
-        _logger.LogInformation("Fetching movies from all providers");
-        
-        var movies = new List<Movie>();
-        var errors = new Dictionary<string, string>();
-        
-        // Fetch movies from all providers in parallel
-        var tasks = _movieServices.Select(service => service.GetMoviesAsync());
-        var results = await Task.WhenAll(tasks);
-        
-        // Combine results
-        foreach (var result in results)
-        {
-            if (result.Success && result.Data != null)
-            {
-                movies.AddRange(result.Data);
-            }
-            else
-            {
-                errors[result.Source] = result.Message;
-                _logger.LogWarning("Error from {Provider}: {Message}", result.Source, result.Message);
-            }
-        }
-        
-        // If all providers failed, return an error
-        if (movies.Count == 0 && errors.Count > 0)
-        {
-            return ServiceResponse<List<Movie>>.FromError(
-                "Failed to fetch movies from all providers", "Aggregator");
-        }
-        
-        _logger.LogInformation("Retrieved {Count} movies from {SuccessCount} providers",
-            movies.Count, results.Count(r => r.Success));
-        
-        var response = ServiceResponse<List<Movie>>.FromSuccess(movies, "Aggregated", false);
-        
-        // Add any errors to the message if some providers failed
-        if (errors.Count > 0)
-        {
-            response.Message = $"Some providers failed: {string.Join(", ", errors.Keys)}";
-        }
-        
-        return response;
-    }
-    
-    public async Task<ServiceResponse<MovieDetails>> GetMovieDetailsAsync(string id)
-    {
-        _logger.LogInformation("Fetching movie details for ID: {Id}", id);
-        
-        // Determine which provider to use based on the ID prefix
-        string providerName = id.StartsWith("fw") ? "Filmworld" : "Cinemaworld";
-        
-        var service = _movieServices.FirstOrDefault(s => s.ProviderName == providerName);
-        
-        if (service == null)
-        {
-            return ServiceResponse<MovieDetails>.FromError(
-                $"No service found for provider: {providerName}", "Aggregator");
-        }
-        
-        var result = await service.GetMovieDetailsAsync(id);
-        
-        // Try the other provider if this one failed
-        if (!result.Success)
-        {
-            _logger.LogWarning("Failed to fetch movie details from {Provider}, trying other providers",
-                providerName);
-            
-            foreach (var fallbackService in _movieServices.Where(s => s.ProviderName != providerName))
-            {
-                // This is just a simple example - in reality, you'd need ID mapping between providers
-                var fallbackResult = await fallbackService.GetMovieDetailsAsync(id);
-                if (fallbackResult.Success)
-                {
-                    _logger.LogInformation("Found movie details in fallback provider: {Provider}",
-                        fallbackService.ProviderName);
-                    return fallbackResult;
-                }
-            }
-        }
-        
-        return result;
+        _resilienceService = resilienceService;
     }
 
     public async IAsyncEnumerable<object> StreamMoviesAsync(
@@ -150,78 +68,52 @@ public class MovieAggregatorService : IMovieAggregatorService
         // Now fetch and stream details for each movie in parallel (up to 10 at once)
         _logger.LogInformation("Streaming movie details for {Count} movies", allMoviesById.Count);
         
-        // Use a semaphore to limit concurrency to 10
-        using var semaphore = new SemaphoreSlim(10);
-        var runningTasks = new List<Task<ServiceResponse<MovieDetails>?>>();
-        var movieQueue = new Queue<KeyValuePair<string, Movie>>(allMoviesById);
+        // Use our resilience service to process movies in parallel with yield return
+        var channel = System.Threading.Channels.Channel.CreateUnbounded<ServiceResponse<MovieDetails>>();
         
-        // Helper method to create a task for fetching movie details
-        async Task<ServiceResponse<MovieDetails>?> FetchMovieDetailsTask(KeyValuePair<string, Movie> moviePair)
+        // Start the background task to process movies
+        var processingTask = Task.Run(async () => 
         {
-            try
-            {
-                await semaphore.WaitAsync(cancellationToken);
-                
-                string movieId = moviePair.Key;
-                Movie movie = moviePair.Value;
-                
-                // Determine the provider for this movie
-                string providerName = movie.Provider;
-                var service = _movieServices.FirstOrDefault(s => s.ProviderName == providerName);
-                
-                if (service != null)
+            await _resilienceService.ExecuteInParallelWithResilienceAsync(
+                allMoviesById,
+                async (moviePair, ct) => 
                 {
-                    // Use Polly to handle retries and failures
-                    var policy = Policy
-                        .Handle<Exception>()
-                        .WaitAndRetryAsync(
-                            3,
-                            retryAttempt => TimeSpan.FromMilliseconds(200 * Math.Pow(2, retryAttempt)),
-                            (ex, timeSpan, retryAttempt, ctx) =>
-                            {
-                                _logger.LogWarning(ex, 
-                                    "Error fetching details for movie {Id} from {Provider}, retry attempt {Attempt}", 
-                                    movieId, providerName, retryAttempt);
-                            });
+                    string movieId = moviePair.Key;
+                    Movie movie = moviePair.Value;
                     
-                    return await policy.ExecuteAsync(() => FetchMovieDetailsAsync(service, movieId, providerName));
-                }
+                    // Determine the provider for this movie
+                    string providerName = movie.Provider;
+                    var service = _movieServices.FirstOrDefault(s => s.ProviderName == providerName);
+                    
+                    if (service != null)
+                    {
+                        return await FetchMovieDetailsAsync(service, movieId, providerName);
+                    }
+                    
+                    return null;
+                },
+                moviePair => $"Movie {moviePair.Key} from {moviePair.Value.Provider}",
+                cancellationToken,
+                async result => 
+                {
+                    if (result != null)
+                    {
+                        await channel.Writer.WriteAsync(result, cancellationToken);
+                    }
+                });
                 
-                return null;
-            }
-            finally
-            {
-                semaphore.Release();
-            }
+            // Mark the channel as complete when all processing is done
+            channel.Writer.Complete();
+        });
+        
+        // Read from the channel and yield results as they come in
+        await foreach (var detailsResponse in channel.Reader.ReadAllAsync(cancellationToken))
+        {
+            yield return detailsResponse;
         }
         
-        // Start initial batch of tasks (up to 10)
-        while (movieQueue.Count > 0 && runningTasks.Count < 10 && !cancellationToken.IsCancellationRequested)
-        {
-            var moviePair = movieQueue.Dequeue();
-            runningTasks.Add(FetchMovieDetailsTask(moviePair));
-        }
-        
-        // Process tasks as they complete and start new ones
-        while (runningTasks.Count > 0 && !cancellationToken.IsCancellationRequested)
-        {
-            var completedTask = await Task.WhenAny(runningTasks);
-            runningTasks.Remove(completedTask);
-            
-            // Yield the result
-            var detailsResponse = await completedTask;
-            if (detailsResponse != null)
-            {
-                yield return detailsResponse;
-            }
-            
-            // Start a new task if there are more movies to process
-            if (movieQueue.Count > 0)
-            {
-                var moviePair = movieQueue.Dequeue();
-                runningTasks.Add(FetchMovieDetailsTask(moviePair));
-            }
-        }
+        // Wait for the processing task to complete
+        await processingTask;
         
         // Now collect all movies and return price information for each
         var allMovies = allMoviesById.Values.ToList();
