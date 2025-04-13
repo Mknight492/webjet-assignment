@@ -202,33 +202,90 @@ public class MovieAggregatorService : IMovieAggregatorService
     }
 
     // Helper method to fetch movie details inside a try-catch block
+    private async Task<ServiceResponse<MovieDetails>> FetchMovieDetailsWithRetriesAsync(
+        IMovieService service, 
+        string movieId, 
+        string providerName,
+        CancellationToken cancellationToken)
+    {
+        // Create a custom retry policy that also checks for missing price data
+        var policy = Policy<ServiceResponse<MovieDetails>>
+            .Handle<Exception>()
+            .OrResult(response => 
+                !response.Success || 
+                response.Data == null || 
+                response.Data.Price <= 0)  // Also retry if price is missing or invalid
+            .WaitAndRetryAsync(
+                _resilienceService.Options.MaxRetries,
+                retryAttempt => TimeSpan.FromMilliseconds(
+                    _resilienceService.Options.InitialRetryDelayMs * 
+                    Math.Pow(_resilienceService.Options.RetryBackoffFactor, retryAttempt)),
+                (outcome, timeSpan, retryCount, context) =>
+                {
+                    if (outcome.Exception != null)
+                    {
+                        _logger.LogWarning(outcome.Exception, 
+                            "Error fetching details for movie {Id} from {Provider}, retry attempt {RetryCount} after {Delay}ms",
+                            movieId, providerName, retryCount, timeSpan.TotalMilliseconds);
+                    }
+                    else if (outcome.Result?.Data == null)
+                    {
+                        _logger.LogWarning(
+                            "No data returned for movie {Id} from {Provider}, retry attempt {RetryCount} after {Delay}ms",
+                            movieId, providerName, retryCount, timeSpan.TotalMilliseconds);
+                    }
+                    else if (outcome.Result.Data.Price <= 0)
+                    {
+                        _logger.LogWarning(
+                            "Missing or invalid price ({Price}) for movie {Id} from {Provider}, retry attempt {RetryCount} after {Delay}ms",
+                            outcome.Result.Data.Price, movieId, providerName, retryCount, timeSpan.TotalMilliseconds);
+                    }
+                    else
+                    {
+                        _logger.LogWarning(
+                            "Unsuccessful response for movie {Id} from {Provider}, retry attempt {RetryCount} after {Delay}ms: {ErrorMessage}",
+                            movieId, providerName, retryCount, timeSpan.TotalMilliseconds,
+                            outcome.Result?.Message ?? "Unknown error");
+                    }
+                });
+        
+        try
+        {
+            // Execute the API call with our specialized retry policy
+            return await policy.ExecuteAsync(() => service.GetMovieDetailsAsync(movieId));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to fetch details for movie {Id} from {Provider} after all retries", 
+                movieId, providerName);
+            return ServiceResponse<MovieDetails>.FromError(
+                $"Failed to fetch details from {providerName} after all retries: {ex.Message}");
+        }
+    }
+
+    // Replace the FetchMovieDetailsAsync method with this improved version
     private async Task<ServiceResponse<MovieDetails>?> FetchMovieDetailsAsync(
         IMovieService service, 
         string movieId, 
         string providerName)
     {
-        try
-        {
-            var detailsResponse = await service.GetMovieDetailsAsync(movieId);
-            
-            if (detailsResponse.Success && detailsResponse.Data != null)
-            {
-                _logger.LogInformation("Streaming details for movie: {Title} from {Provider}", 
-                    detailsResponse.Data.Title, providerName);
-                
-                // Return the MovieDetails directly, no need for conversion
-                return ServiceResponse<MovieDetails>.FromSuccess(
-                    detailsResponse.Data, 
-                    $"{providerName}Details", 
-                    false);
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error fetching details for movie {Id} from {Provider}", 
-                movieId, providerName);
-        }
+        var detailsResponse = await FetchMovieDetailsWithRetriesAsync(service, movieId, providerName, CancellationToken.None);
         
-        return null;
+        if (detailsResponse.Success && detailsResponse.Data != null && detailsResponse.Data.Price > 0)
+        {
+            _logger.LogInformation("Successfully fetched details for movie: {Title} from {Provider} with price {Price}", 
+                detailsResponse.Data.Title, providerName, detailsResponse.Data.Price);
+            
+            return ServiceResponse<MovieDetails>.FromSuccess(
+                detailsResponse.Data, 
+                $"{providerName}Details", 
+                false);
+        }
+        else
+        {
+            _logger.LogWarning("Failed to fetch valid details for movie {Id} from {Provider} after all retries: {Message}", 
+                movieId, providerName, detailsResponse.Message);
+            return null;
+        }
     }
 } 
