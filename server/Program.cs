@@ -8,6 +8,9 @@ using Microsoft.OpenApi.Models;
 using Microsoft.OpenApi.Writers;
 using Swashbuckle.AspNetCore.Swagger;
 using System.IO;
+using Microsoft.Extensions.Resilience;
+using Microsoft.Extensions.Http.Resilience;
+using Polly;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -23,19 +26,29 @@ builder.Services.AddControllers()
 builder.Services.Configure<MovieApiOptions>(
     builder.Configuration.GetSection("MovieApi"));
 
+// By default, we want all HttpClient instances to include the StandardResilienceHandler.
+builder.Services.ConfigureHttpClientDefaults(builder => builder.AddStandardResilienceHandler(options => {
+  options.Retry = new HttpRetryStrategyOptions
+    {
+        // Customize and configure the retry logic.
+        BackoffType = DelayBackoffType.Linear,
+        MaxRetryAttempts = 10,
+        UseJitter = true,
+        Delay = TimeSpan.FromMilliseconds(100)
+    };
+}));    
+
 // Configure HTTP clients
 builder.Services.AddHttpClient("Cinemaworld", client =>
 {
     client.BaseAddress = new Uri("https://webjetapitest.azurewebsites.net/api/cinemaworld/");
     client.DefaultRequestHeaders.Add("x-access-token", builder.Configuration["MovieApi:ApiKey"]);
-    client.Timeout = TimeSpan.FromSeconds(5);
 });
 
 builder.Services.AddHttpClient("Filmworld", client =>
 {
     client.BaseAddress = new Uri("https://webjetapitest.azurewebsites.net/api/filmworld/");
     client.DefaultRequestHeaders.Add("x-access-token", builder.Configuration["MovieApi:ApiKey"]);
-    client.Timeout = TimeSpan.FromSeconds(5);
 });
 
 // Add CORS for frontend
@@ -81,9 +94,6 @@ builder.Services.AddTransient<IMovieAggregatorService, MovieAggregatorService>()
 
 // Register ResilienceOptions from configuration
 builder.Services.Configure<ResilienceOptions>(builder.Configuration.GetSection("Resilience"));
-
-// Register the ResilienceService
-builder.Services.AddSingleton<IResilienceService, ResilienceService>();
 
 var app = builder.Build();
 

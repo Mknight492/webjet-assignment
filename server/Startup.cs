@@ -19,9 +19,6 @@ namespace MoviePriceComparison.Server
         {
             // Register ResilienceOptions from configuration
             services.Configure<ResilienceOptions>(Configuration.GetSection("Resilience"));
-
-            // Register the ResilienceService
-            services.AddSingleton<IResilienceService, ResilienceService>();
         }
 
         public void Configure(IApplicationBuilder app)
