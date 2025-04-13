@@ -143,7 +143,7 @@ public class MovieAggregatorService : IMovieAggregatorService
                     
                     if (service != null)
                     {
-                        var result = await FetchMovieDetailsAsync(service, movieId, providerName);
+                        var result = await FetchMovieDetailsAsync(service, movieId, providerName, ct);
                         Interlocked.Increment(ref completedDetailsCount);
                         
                         if (result != null && result.Success)
@@ -210,7 +210,7 @@ public class MovieAggregatorService : IMovieAggregatorService
     {
         // Create a custom retry policy that also checks for missing price data
         var policy = Policy<ServiceResponse<MovieDetails>>
-            .Handle<Exception>()
+            .Handle<Exception>(ex => !(ex is OperationCanceledException)) // Don't retry cancellations
             .OrResult(response => 
                 !response.Success || 
                 response.Data == null || 
@@ -222,6 +222,10 @@ public class MovieAggregatorService : IMovieAggregatorService
                     Math.Pow(_resilienceService.Options.RetryBackoffFactor, retryAttempt)),
                 (outcome, timeSpan, retryCount, context) =>
                 {
+                    // Check if cancellation is requested before logging
+                    if (cancellationToken.IsCancellationRequested)
+                        return;
+                    
                     if (outcome.Exception != null)
                     {
                         _logger.LogWarning(outcome.Exception, 
@@ -252,10 +256,23 @@ public class MovieAggregatorService : IMovieAggregatorService
         try
         {
             // Execute the API call with our specialized retry policy
-            return await policy.ExecuteAsync(() => service.GetMovieDetailsAsync(movieId));
+            // Use the correct Polly API overload for ExecuteAsync with cancellation token
+            return await policy.ExecuteAsync(
+                (context) => service.GetMovieDetailsAsync(movieId),
+                cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Propagate cancellation
+            throw;
         }
         catch (Exception ex)
         {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                throw new OperationCanceledException("Operation was canceled", ex, cancellationToken);
+            }
+            
             _logger.LogError(ex, "Failed to fetch details for movie {Id} from {Provider} after all retries", 
                 movieId, providerName);
             return ServiceResponse<MovieDetails>.FromError(
@@ -267,24 +284,33 @@ public class MovieAggregatorService : IMovieAggregatorService
     private async Task<ServiceResponse<MovieDetails>?> FetchMovieDetailsAsync(
         IMovieService service, 
         string movieId, 
-        string providerName)
+        string providerName,
+        CancellationToken cancellationToken = default)
     {
-        var detailsResponse = await FetchMovieDetailsWithRetriesAsync(service, movieId, providerName, CancellationToken.None);
-        
-        if (detailsResponse.Success && detailsResponse.Data != null && detailsResponse.Data.Price > 0)
+        try
         {
-            _logger.LogInformation("Successfully fetched details for movie: {Title} from {Provider} with price {Price}", 
-                detailsResponse.Data.Title, providerName, detailsResponse.Data.Price);
+            var detailsResponse = await FetchMovieDetailsWithRetriesAsync(service, movieId, providerName, cancellationToken);
             
-            return ServiceResponse<MovieDetails>.FromSuccess(
-                detailsResponse.Data, 
-                $"{providerName}Details", 
-                false);
+            if (detailsResponse.Success && detailsResponse.Data != null && detailsResponse.Data.Price > 0)
+            {
+                _logger.LogInformation("Successfully fetched details for movie: {Title} from {Provider} with price {Price}", 
+                    detailsResponse.Data.Title, providerName, detailsResponse.Data.Price);
+                
+                return ServiceResponse<MovieDetails>.FromSuccess(
+                    detailsResponse.Data, 
+                    $"{providerName}Details", 
+                    false);
+            }
+            else
+            {
+                _logger.LogWarning("Failed to fetch valid details for movie {Id} from {Provider} after all retries: {Message}", 
+                    movieId, providerName, detailsResponse.Message);
+                return null;
+            }
         }
-        else
+        catch (OperationCanceledException)
         {
-            _logger.LogWarning("Failed to fetch valid details for movie {Id} from {Provider} after all retries: {Message}", 
-                movieId, providerName, detailsResponse.Message);
+            _logger.LogInformation("Request for movie {Id} from {Provider} was canceled", movieId, providerName);
             return null;
         }
     }
