@@ -12,7 +12,6 @@ export const useMovies = () => {
     queryKey: ["movies"],
     queryFn: async () => {
         const response = await api.get<MoviesResponse>("/movies");
-        console.log(response.data);
         return response.data;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes

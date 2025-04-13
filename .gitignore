@@ -87,6 +87,7 @@ client/coverage/
 # IDE/editor specific files
 .idea/
 .vscode/
+.vs/
 *.swp
 *.swo
 .DS_Store

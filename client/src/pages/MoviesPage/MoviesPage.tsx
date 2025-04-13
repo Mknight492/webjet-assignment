@@ -51,12 +51,12 @@ const MoviesPage: React.FC = () => {
         const detail = movieDetails[movieId];
         const provider = movie.provider.toLowerCase();
         
-        if (provider === 'cinemaworld') {
+        if (provider.toLowerCase() === 'cinemaworld') {
           if (detail?.price !== undefined) {
             comparison.prices.cinemaworld = detail.price.toString();
             comparison.priceLoadingStates.cinemaworld = false;
           }
-        } else if (provider === 'filmworld') {
+        } else if (provider.toLowerCase() === 'filmworld') {
           if (detail?.price !== undefined) {
             comparison.prices.filmworld = detail.price.toString();
             comparison.priceLoadingStates.filmworld = false;

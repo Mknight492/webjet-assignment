@@ -5,6 +5,10 @@ using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using Polly;
+using Polly.Bulkhead;
+using System.Threading.Tasks.Dataflow;
+using System.Collections.Concurrent;
 
 namespace MoviePriceComparison.Services;
 
@@ -143,32 +147,79 @@ public class MovieAggregatorService : IMovieAggregatorService
             yield return result;
         }
         
-        // Now fetch and stream details for each movie
+        // Now fetch and stream details for each movie in parallel (up to 10 at once)
         _logger.LogInformation("Streaming movie details for {Count} movies", allMoviesById.Count);
         
-        foreach (var moviePair in allMoviesById)
+        // Use a semaphore to limit concurrency to 10
+        using var semaphore = new SemaphoreSlim(10);
+        var runningTasks = new List<Task<ServiceResponse<MovieDetails>?>>();
+        var movieQueue = new Queue<KeyValuePair<string, Movie>>(allMoviesById);
+        
+        // Helper method to create a task for fetching movie details
+        async Task<ServiceResponse<MovieDetails>?> FetchMovieDetailsTask(KeyValuePair<string, Movie> moviePair)
         {
-            if (cancellationToken.IsCancellationRequested)
-                break;
-                
-            string movieId = moviePair.Key;
-            Movie movie = moviePair.Value;
-            
-            // Determine the provider for this movie
-            string providerName = movie.Provider;
-            var service = _movieServices.FirstOrDefault(s => s.ProviderName == providerName);
-            
-            if (service != null)
+            try
             {
-                // Get movie details and yield as is - no conversion needed
-                var detailsResponse = await FetchMovieDetailsAsync(service, movieId, providerName);
+                await semaphore.WaitAsync(cancellationToken);
                 
-                if (detailsResponse != null)
+                string movieId = moviePair.Key;
+                Movie movie = moviePair.Value;
+                
+                // Determine the provider for this movie
+                string providerName = movie.Provider;
+                var service = _movieServices.FirstOrDefault(s => s.ProviderName == providerName);
+                
+                if (service != null)
                 {
-                    yield return detailsResponse;
+                    // Use Polly to handle retries and failures
+                    var policy = Policy
+                        .Handle<Exception>()
+                        .WaitAndRetryAsync(
+                            3,
+                            retryAttempt => TimeSpan.FromMilliseconds(200 * Math.Pow(2, retryAttempt)),
+                            (ex, timeSpan, retryAttempt, ctx) =>
+                            {
+                                _logger.LogWarning(ex, 
+                                    "Error fetching details for movie {Id} from {Provider}, retry attempt {Attempt}", 
+                                    movieId, providerName, retryAttempt);
+                            });
+                    
+                    return await policy.ExecuteAsync(() => FetchMovieDetailsAsync(service, movieId, providerName));
                 }
                 
-                await Task.Delay(50, cancellationToken); // Add a small delay between detail requests
+                return null;
+            }
+            finally
+            {
+                semaphore.Release();
+            }
+        }
+        
+        // Start initial batch of tasks (up to 10)
+        while (movieQueue.Count > 0 && runningTasks.Count < 10 && !cancellationToken.IsCancellationRequested)
+        {
+            var moviePair = movieQueue.Dequeue();
+            runningTasks.Add(FetchMovieDetailsTask(moviePair));
+        }
+        
+        // Process tasks as they complete and start new ones
+        while (runningTasks.Count > 0 && !cancellationToken.IsCancellationRequested)
+        {
+            var completedTask = await Task.WhenAny(runningTasks);
+            runningTasks.Remove(completedTask);
+            
+            // Yield the result
+            var detailsResponse = await completedTask;
+            if (detailsResponse != null)
+            {
+                yield return detailsResponse;
+            }
+            
+            // Start a new task if there are more movies to process
+            if (movieQueue.Count > 0)
+            {
+                var moviePair = movieQueue.Dequeue();
+                runningTasks.Add(FetchMovieDetailsTask(moviePair));
             }
         }
         
