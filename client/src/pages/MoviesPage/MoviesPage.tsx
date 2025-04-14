@@ -176,7 +176,7 @@ const MoviesPage: React.FC = () => {
     // but we can force a page reload as a fallback
     window.location.reload();
   };
-  
+
   return (
     <div>
       {hasPartialData && Object.keys(providerErrors).length > 0 && (
@@ -257,7 +257,6 @@ const MoviesPage: React.FC = () => {
       ) : (
         <MovieGrid
           movies={filteredAndSortedMovies}
-          isLoading={loading}
           isError={false}
           error={error}
           refetch={refetch}
