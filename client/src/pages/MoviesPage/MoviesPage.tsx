@@ -4,6 +4,7 @@ import FilterControls from "../../components/FilterControls";
 import { useStreamingMovies } from "../../hooks/useStreamingMovies";
 import { Movie, MovieComparison, MovieDetail } from "../../types/Movie";
 import { Link } from "react-router-dom";
+import { useStreamingMovies2 } from "hooks/useStreamingMovies2";
 
 const MoviesPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -16,7 +17,7 @@ const MoviesPage: React.FC = () => {
     error,
     providerErrors,
     hasPartialData 
-  } = useStreamingMovies();
+  } = useStreamingMovies2();
  
 
   // Transform the streaming data into MovieComparison objects
