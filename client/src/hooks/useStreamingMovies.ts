@@ -12,7 +12,7 @@ export const useStreamingMovies = () => {
   const [hasPartialData, setHasPartialData] = useState(false);
 
   useEffect(() => {
-    const eventSource = new EventSource(`${process.env.REACT_APP_API_URL || 'https://localhost:7168/api'}/Movies/stream`);
+    const eventSource = new EventSource(`${process.env.REACT_APP_API_URL || 'https://localhost:7168'}/api/Movies/stream`);
     
     eventSource.onmessage = (event) => {
       try {

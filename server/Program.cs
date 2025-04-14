@@ -61,10 +61,11 @@ builder.Services.AddHttpClient("Filmworld", client =>
 // Add CORS for frontend
 builder.Services.AddCors(options =>
 {
+  var allowedOrigins = builder.Configuration.GetSection("AllowedOrigins").Get<string[]>() 
+      ?? new[] { "http://localhost:3000" };
+      
     options.AddPolicy("CorsPolicy", builder =>
     {
-        var allowedOrigins = builder.Configuration.GetSection("AllowedOrigins").Get<string[]>() 
-            ?? new[] { "http://localhost:3000" };
             
         builder
             .WithOrigins(allowedOrigins)
