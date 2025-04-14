@@ -13,13 +13,16 @@ public class MovieAggregatorService : IMovieAggregatorService
 {
     private readonly IEnumerable<IMovieService> _movieServices;
     private readonly ILogger<MovieAggregatorService> _logger;
+    private readonly ITMDBService _tmdbService;
     
     public MovieAggregatorService(
         IEnumerable<IMovieService> movieServices,
-        ILogger<MovieAggregatorService> logger)
+        ILogger<MovieAggregatorService> logger,
+        ITMDBService tmdbService)
     {
         _movieServices = movieServices;
         _logger = logger;
+        _tmdbService = tmdbService;
     }
 
     public async IAsyncEnumerable<object> StreamMoviesAsync(
@@ -65,6 +68,19 @@ public class MovieAggregatorService : IMovieAggregatorService
                 {
                     int movieCount = result.Data.Count;
                     _logger.LogInformation("Received {Count} movies from {Provider}", movieCount, providerName);
+                    
+                    // Enrich movies with TMDB data
+                    try
+                    {
+                        var enrichedMovies = await _tmdbService.EnrichMoviesWithTMDBDataAsync(result.Data);
+                        result = ServiceResponse<List<Movie>>.FromSuccess(enrichedMovies, providerName, result.FromCache);
+                        _logger.LogInformation("Enriched {Count} movies from {Provider} with TMDB data", 
+                            enrichedMovies.Count, providerName);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to enrich movies from {Provider} with TMDB data, using original posters", providerName);
+                    }
                     
                     foreach (var movie in result.Data)
                     {
@@ -160,6 +176,21 @@ public class MovieAggregatorService : IMovieAggregatorService
                             Interlocked.Increment(ref successfulDetailsCount);
                             _logger.LogInformation("Successfully fetched details for movie {Id} ({Title}) - Progress: {Completed}/{Total}", 
                                 movieId, result.Data?.Title ?? "Unknown", completedDetailsCount, allMoviesById.Count);
+                            
+                            // Enrich with TMDB data
+                            if (result.Data != null)
+                            {
+                                try
+                                {
+                                    result.Data = await _tmdbService.EnrichMovieDetailsWithTMDBDataAsync(result.Data);
+                                    _logger.LogInformation("Enriched movie {Id} ({Title}) with TMDB data", 
+                                        movieId, result.Data.Title);
+                                }
+                                catch (Exception tmdbEx)
+                                {
+                                    _logger.LogWarning(tmdbEx, "Failed to enrich movie {Id} with TMDB data, using original poster", movieId);
+                                }
+                            }
                                 
                             await channel.Writer.WriteAsync(
                                 ServiceResponse<MovieDetails>.FromSuccess(
@@ -262,6 +293,19 @@ public class MovieAggregatorService : IMovieAggregatorService
                     int movieCount = result.Data.Count;
                     _logger.LogInformation("Received {Count} movies from {Provider}", movieCount, providerName);
                     
+                    // Enrich movies with TMDB data
+                    try
+                    {
+                        var enrichedMovies = await _tmdbService.EnrichMoviesWithTMDBDataAsync(result.Data);
+                        result = ServiceResponse<List<Movie>>.FromSuccess(enrichedMovies, providerName, result.FromCache);
+                        _logger.LogInformation("Enriched {Count} movies from {Provider} with TMDB data", 
+                            enrichedMovies.Count, providerName);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to enrich movies from {Provider} with TMDB data, using original posters", providerName);
+                    }
+                    
                     foreach (var movie in result.Data)
                     {
                         allMoviesById[movie.Id] = movie;
@@ -317,6 +361,21 @@ public class MovieAggregatorService : IMovieAggregatorService
                             Interlocked.Increment(ref successfulDetailsCount);
                             _logger.LogInformation("Successfully fetched details for movie {Id} ({Title}) - Progress: {Completed}/{Total}", 
                                 movieId, result.Data?.Title ?? "Unknown", completedDetailsCount, allMoviesById.Count);
+                            
+                            // Enrich with TMDB data
+                            if (result.Data != null)
+                            {
+                                try
+                                {
+                                    result.Data = await _tmdbService.EnrichMovieDetailsWithTMDBDataAsync(result.Data);
+                                    _logger.LogInformation("Enriched movie details {Id} ({Title}) with TMDB data", 
+                                        movieId, result.Data.Title);
+                                }
+                                catch (Exception tmdbEx)
+                                {
+                                    _logger.LogWarning(tmdbEx, "Failed to enrich movie details {Id} with TMDB data, using original poster", movieId);
+                                }
+                            }
                                 
                             await channel.Writer.WriteAsync(
                                 ServiceResponse<MovieDetails>.FromSuccess(

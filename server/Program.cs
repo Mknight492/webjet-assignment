@@ -58,6 +58,20 @@ builder.Services.AddHttpClient("Filmworld", client =>
     client.DefaultRequestHeaders.Add("x-access-token", builder.Configuration["MovieApi:ApiKey"]);
 });
 
+// Register TMDB configuration
+builder.Services.Configure<TMDBOptions>(
+    builder.Configuration.GetSection(TMDBOptions.Position));
+
+// Register TMDB HTTP client
+builder.Services.AddHttpClient("TMDB", client =>
+{
+    var tmdbOptions = builder.Configuration.GetSection(TMDBOptions.Position).Get<TMDBOptions>();
+    client.BaseAddress = new Uri(tmdbOptions.BaseUrl);
+});
+
+// Register TMDB service
+builder.Services.AddScoped<ITMDBService, TMDBService>();
+
 // Add CORS for frontend
 builder.Services.AddCors(options =>
 {
