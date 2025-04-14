@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { Movie, MovieDetail, ServiceResponse } from '../types';
-import { toCamelCase } from '../utils/casing';
 
 export const useStreamingMovies = () => {
   const [providerMovies, setProviderMovies] = useState<Record<string, Movie[]>>({});
@@ -25,8 +24,7 @@ export const useStreamingMovies = () => {
     // Movies stream handling
     movieEventSource.onmessage = (event) => {
       try {
-        const rawResponse = JSON.parse(event.data);
-        const response = toCamelCase<ServiceResponse<any>>(rawResponse);
+        const response = JSON.parse(event.data) as ServiceResponse<any>;
         
         if (response.success && response.data) {
           // Set hasPartialData to true as soon as we get any successful data
@@ -58,8 +56,7 @@ export const useStreamingMovies = () => {
     // Details stream handling
     detailsEventSource.onmessage = (event) => {
       try {
-        const rawResponse = JSON.parse(event.data);
-        const response = toCamelCase<ServiceResponse<any>>(rawResponse);
+        const response = JSON.parse(event.data) as ServiceResponse<any>;
         
         if (response.success && response.data) {
           // Set hasPartialData to true as soon as we get any successful data
