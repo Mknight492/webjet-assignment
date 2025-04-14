@@ -1,9 +1,24 @@
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using System.Threading;
 using MoviePriceComparison.Models;
 
 namespace MoviePriceComparison.Services.Interfaces;
 
 public interface IMovieAggregatorService
-{    
-    // Update to include separate types for different data
+{
+    /// <summary>
+    /// Streams the list of movies from all providers
+    /// </summary>
     IAsyncEnumerable<object> StreamMoviesAsync(CancellationToken cancellationToken = default);
+    
+    /// <summary>
+    /// Streams movie details from all providers
+    /// </summary>
+    IAsyncEnumerable<object> StreamMovieDetailsAsync(CancellationToken cancellationToken = default);
+    
+    /// <summary>
+    /// Streams both movies and their details from all providers
+    /// </summary>
+    IAsyncEnumerable<object> StreamMoviesAndDetailsAsync(CancellationToken cancellationToken = default);
 } 

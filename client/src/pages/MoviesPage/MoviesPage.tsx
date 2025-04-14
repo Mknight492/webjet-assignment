@@ -4,6 +4,7 @@ import FilterControls from "../../components/FilterControls";
 import { useStreamingMovies } from "../../hooks/useStreamingMovies";
 import { Movie, MovieComparison, MovieDetail } from "../../types/Movie";
 import { Link } from "react-router-dom";
+import { useStreamingMovies2 } from "hooks/useStreamingMovies2";
 
 const MoviesPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -16,7 +17,7 @@ const MoviesPage: React.FC = () => {
     error,
     providerErrors,
     hasPartialData 
-  } = useStreamingMovies();
+  } = useStreamingMovies2();
  
 
   // Transform the streaming data into MovieComparison objects
@@ -105,7 +106,7 @@ const MoviesPage: React.FC = () => {
     return Object.values(moviesByTitle);
   }, [providerMovies, movieDetails, priceComparisons, providerErrors]);
 
-  console.log("processedMovies", processedMovies);
+
   
   // Filter and sort movies based on user input
   const filteredAndSortedMovies = React.useMemo(() => {
@@ -175,7 +176,7 @@ const MoviesPage: React.FC = () => {
     // but we can force a page reload as a fallback
     window.location.reload();
   };
-
+  
   return (
     <div>
       {hasPartialData && Object.keys(providerErrors).length > 0 && (
@@ -219,7 +220,7 @@ const MoviesPage: React.FC = () => {
 
       <FilterControls sortBy={sortBy} onSortChange={setSortBy} />
 
-      {loading && !hasPartialData ? (
+      {loading && (!processedMovies.length) ? (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {[...Array(10)].map((_, i) => (
             <div key={i} className="bg-white rounded-lg shadow-md overflow-hidden">
