@@ -62,6 +62,7 @@ This application follows a monorepo structure with a .NET Backend for Frontend (
    ```
    dotnet user-secrets init
    dotnet user-secrets set "MovieApi:ApiKey" "your-api-token"
+   dotnet user-secrets set "TMDB:ApiKey" "your-api-token"
    ```
 
 4. Set up frontend
@@ -99,26 +100,13 @@ The application is built with resilience in mind, using a Backend for Frontend (
 
 Key resilience strategies include:
 
-- Polly-based retry and circuit breaker patterns
+- .Net Resilience library for retry and circuit breaker patterns
 - Server-side caching for reduced API dependency
-- Fallback mechanisms when services are unavailable
 - Graceful degradation of functionality
 
 ## Testing
 
-### Backend Tests
-
-```
-cd server
-dotnet test
-```
-
-### Frontend Tests
-
-```
-cd client
-npm test
-```
+TODO
 
 ## Building for Production
 
@@ -138,11 +126,7 @@ npm run build
 
 ## Deployment
 
-TODO: Add deployment instructions
-
-```
-docker-compose up -d
-```
+CICD pipeline deploys to Azure Static Web Apps and Azure App Services on merge to main
 
 ## License
 
