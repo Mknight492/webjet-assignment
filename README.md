@@ -24,25 +24,21 @@ This application follows a monorepo structure with a .NET Backend for Frontend (
 
 ### Backend (.NET BFF)
 
-- ASP.NET Core 6+
-- Polly for resilience patterns
-- Refit for typed HTTP clients
-- In-memory and distributed caching
-- Serilog for logging
+- ASP.NET Core 8
+- .Net Resilience library for retry and circuit breaker patterns
+- In-memory caching
+- Server sent events for streaming slow price updates to the client
 
 ### Frontend (React)
 
 - React with TypeScript
-- React Query for server state
-- Context API for UI state
 - Tailwind CSS for styling
-- Axios for API communication
 
 ## Getting Started
 
 ### Prerequisites
 
-- .NET 6+ SDK
+- .NET 8 SDK
 - Node.js (v14+)
 - npm or yarn
 
