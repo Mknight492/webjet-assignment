@@ -16,9 +16,4 @@ public interface IMovieAggregatorService
     /// Streams movie details from all providers
     /// </summary>
     IAsyncEnumerable<object> StreamMovieDetailsAsync(CancellationToken cancellationToken = default);
-    
-    /// <summary>
-    /// Streams both movies and their details from all providers
-    /// </summary>
-    IAsyncEnumerable<object> StreamMoviesAndDetailsAsync(CancellationToken cancellationToken = default);
 } 

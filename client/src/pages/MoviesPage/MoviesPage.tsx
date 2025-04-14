@@ -1,10 +1,9 @@
 import React, { useState } from "react";
 import MovieGrid from "../../components/MovieGrid";
 import FilterControls from "../../components/FilterControls";
-import { useStreamingMovies } from "../../hooks/useStreamingMovies";
 import { Movie, MovieComparison, MovieDetail } from "../../types/Movie";
 import { Link } from "react-router-dom";
-import { useStreamingMovies2 } from "hooks/useStreamingMovies2";
+import { useStreamingMovies } from "hooks/useStreamingMovies";
 
 const MoviesPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -17,7 +16,7 @@ const MoviesPage: React.FC = () => {
     error,
     providerErrors,
     hasPartialData 
-  } = useStreamingMovies2();
+  } = useStreamingMovies();
  
 
   // Transform the streaming data into MovieComparison objects
@@ -176,7 +175,7 @@ const MoviesPage: React.FC = () => {
     // but we can force a page reload as a fallback
     window.location.reload();
   };
-  
+
   return (
     <div>
       {hasPartialData && Object.keys(providerErrors).length > 0 && (
@@ -257,7 +256,6 @@ const MoviesPage: React.FC = () => {
       ) : (
         <MovieGrid
           movies={filteredAndSortedMovies}
-          isLoading={loading}
           isError={false}
           error={error}
           refetch={refetch}

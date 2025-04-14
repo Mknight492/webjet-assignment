@@ -3,7 +3,6 @@ import { MovieComparison } from "../../types/Movie";
 
 interface MovieGridProps {
   movies: MovieComparison[];
-  isLoading: boolean;
   isError: boolean;
   error: string | null;
   refetch: () => void;
@@ -12,15 +11,11 @@ interface MovieGridProps {
 
 const MovieGrid: React.FC<MovieGridProps> = ({ 
   movies, 
-  isLoading, 
   isError, 
   error, 
   refetch,
   getMovieUrl 
 }) => {
-  if (isLoading) {
-    return <div>Loading...</div>;
-  }
 
   if (isError) {
     return (
